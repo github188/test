@@ -73,6 +73,7 @@ def CaseLoad(fname):
 	root = doc.documentElement
 
 	_case = Case()
+	_case.name = fname
 	_case.cmd_list = CmdLoad(__get_xmlnode(root, 'command'))
 	_case.workflow.cmd_id_list = WorkFlowLoad(__get_xmlnode(root, 'work_flow'))
 

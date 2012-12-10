@@ -13,5 +13,6 @@ class WorkFlow:
 
 class Case:
 	def __init__(self):
+		self.name = ''
 		self.cmd_list = []
 		self.workflow = WorkFlow()
