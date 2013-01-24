@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import os
 from libmd import do_md_test
 from libnetwork import do_network_test
 from libcpu import do_cpu_test
@@ -9,8 +10,9 @@ from liblog import mon_log
 
 def test_main():
 	mon_log('INFO', '启动测试进程')
+	os.popen('/root/pressure/cleanup.sh')
 	do_md_test()
-	do_network_test()
+	#do_network_test()
 	do_cpu_test()
 	timeout = 0
 	try:

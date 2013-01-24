@@ -21,7 +21,7 @@ def do_md_test():
 	try:
 		md_list = json.loads(text)['rows']
 		for md in md_list:
-			#os.popen('%s %s &' % (op_bin, md['dev']))
+			os.popen('%s %s &' % (op_bin, md['dev']))
 			mon_add('%s %s 压力测试-进程检测' % (md['name'], md['dev']), 'process', 'xdd')
 			mon_add('%s %s 压力测试-速率检测' % (md['name'], md['dev']),  'speed', '%s,read_speed=1,write_speed=1' % md['dev'])
 	except:
