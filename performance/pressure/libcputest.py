@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from libmon import mon_add
+from libmontest import mon_add
 
 _cpu_exec = '/root/pressure/kill-idle.sh'
 

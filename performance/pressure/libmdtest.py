@@ -5,8 +5,8 @@ import json
 import commands
 import sys
 import os
-from libmon import mon_add
-from libmon import mon_log
+from libmontest import mon_add
+from libmontest import mon_log
 
 reload(sys)
 sys.setdefaultencoding('utf8')

@@ -1,12 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/python -u
 # -*- coding: utf-8 -*-
 
 import os
-from libmd import do_md_test
-from libnetwork import do_network_test
-from libcpu import do_cpu_test
-from libmon import do_mon
-from liblog import mon_log
+from libmdtest import do_md_test
+from libnetworktest import do_network_test
+from libcputest import do_cpu_test
+from libmontest import do_mon
+from liblogtest import mon_log
 
 def test_main():
 	mon_log('INFO', '启动测试进程')

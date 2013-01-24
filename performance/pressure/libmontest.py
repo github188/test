@@ -6,7 +6,7 @@ import datetime
 import commands
 import re
 import sys
-from liblog import mon_log
+from liblogtest import mon_log
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -57,7 +57,7 @@ def _mon_check_speed(param):
 		mon_log('WARN', '获取块设备 %s 速率失败!' % dev)
 		return
 	try:
-		speed_str = re.findall('md\d+ +\d.\d+ +\d+.\d+ +\d+.\d+', text)[0]
+		speed_str = re.findall('md\d+ +\d+.\d+ +\d+.\d+ +\d+.\d+', text)[0]
 	except:
 		mon_log('WARN', '无法解析块设备 %s 速率结果 %s' % (dev, text))
 		return
