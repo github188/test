@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<case>
+	<command id="V01">
+		<text>sys-manager vg --create --name slash --level 5 --strip 128 --disk 0:1,0:2,0:3</text>
+		<description>使用槽位号0:1,0:2,0:3的磁盘创建RAID级别5的卷组</description>
+	</command>
+
+	<command id="V02">
+		<text>sys-manager vg --list</text>
+		<description>检查VG列表</description>
+	</command>
+
+	<command id="V03">
+		<text>sys-manager vg --delete slash</text>
+		<description>删除卷组slash</description>
+	</command>
+
+	<work_flow>
+		<step cmd_id="D01"/>
+		<step cmd_id="D02"/>
+		<step cmd_id="D03"/>
+	</work_flow>
+</case>

@@ -76,7 +76,7 @@ fi
 echo "super扇区测试成功"
 
 echo "清除super扇区错误"
-echo "${sect} 2" > /sys/block/$pdisk/make-it-fail
+echo "${sect} 3" > /sys/block/$pdisk/make-it-fail
 
 echo "map扇区测试，注入写错误"
 metadata_offset=`cat /sys/block/$vdisk/bad_sect_map/metadata_offset`
@@ -115,7 +115,7 @@ fi
 echo "map扇区测试成功"
 
 echo "清除map扇区错误"
-echo "${sect} 2" > /sys/block/$pdisk/make-it-fail
+echo "${sect} 3" > /sys/block/$pdisk/make-it-fail
 
 echo "data扇区测试，注入写错误"
 sect=`cat /sys/block/$vdisk/bad_sect_map/data_offset`
@@ -142,7 +142,7 @@ if [ -z "$mapped_sectors" ]; then
 	return 1
 fi
 
-echo "${sect} 2" > /sys/block/$pdisk/make-it-fail
+echo "${sect} 3" > /sys/block/$pdisk/make-it-fail
 echo "data扇区测试，注入写错误"
 let sect=$sect+1
 echo "${sect} 1" > /sys/block/$pdisk/make-it-fail
@@ -177,5 +177,5 @@ fi
 
 echo "data扇区测试成功"
 
-echo "${sect} 2" > /sys/block/$pdisk/make-it-fail
-echo "0 2" > /sys/block/$pdisk/make-it-fail
+echo "${sect} 3" > /sys/block/$pdisk/make-it-fail
+echo "0 3" > /sys/block/$pdisk/make-it-fail

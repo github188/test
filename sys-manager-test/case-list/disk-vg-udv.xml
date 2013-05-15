@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<case>
+	<command id="DVU01">
+		<text>sys-manager disk --list</text>
+		<description>检查磁盘列表</description>
+	</command>
+
+	<command id="DVU02">
+		<text>sys-manager vg --create --name slash --level 5 --strip 128 --disk 0:1,0:2,0:3</text>
+		<description>使用槽位号为0:1,0:2,0:3的磁盘创建RAID级别5的卷组</description>
+	</command>
+
+	<command id="DVU03">
+		<text>sys-manager vg --list</text>
+		<description>卷组列表</description>
+	</command>
+
+	<command id="DVU04">
+		<text>sys-manager udv --create --vg slash --name udv1 --capacity 5000000000</text>
+		<description>在卷组slash上创建一个名为udv1的容量为500000000的用户数据卷</description>
+	</command>
+
+	<command id="DVU05">
+		<text>sys-manager udv --list</text>
+		<description>检查UDV列表</description>
+	</command>
+
+	<command id="DVU06">
+		<text>sys-manager udv --remain-capacity --vg slash</text>
+		<description>检查VG slash的剩余容量</description>
+	</command>
+
+	<command id="DVU07">
+		<text>sys-manager udv --delete udv1</text>
+		<description>删除udv1</description>
+	</command>
+
+	<command id="DVU08">
+		<text>sys-manager vg --delete slash</text>
+		<description>删除卷组slash</description>
+	</command>
+
+	<work_flow>
+		<step cmd_id="DVU01"/>
+
+		<step cmd_id="DVU02"/>
+		<step cmd_id="DVU03"/>
+		<step cmd_id="DVU01"/>
+
+		<step cmd_id="DVU04"/>
+		<step cmd_id="DVU05"/>
+		<step cmd_id="DVU03"/>
+		<step cmd_id="DVU01"/>
+
+		<step cmd_id="DVU06"/>
+		<step cmd_id="DVU05"/>
+		<step cmd_id="DVU03"/>
+		<step cmd_id="DVU01"/>
+
+		<step cmd_id="DVU07"/>
+		<step cmd_id="DVU05"/>
+		<step cmd_id="DVU03"/>
+		<step cmd_id="DVU01"/>
+
+		<step cmd_id="DVU08"/>
+		<step cmd_id="DVU05"/>
+		<step cmd_id="DVU03"/>
+		<step cmd_id="DVU01"/>
+	</work_flow>
+</case>
