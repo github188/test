@@ -1,0 +1,314 @@
+#!/bin/sh
+
+usage()
+{
+	echo "usage: $prog_name [--io <disk|raid|none>] [--net <none|both|transmit|receive> --role <a|b>] [--cpu <full|none>]"
+	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡按顺序一对一直连, 例如: '设备a' 的 'LAN1' 和 '设备b' 的 'LAN1' 连接"
+	echo "           测试启动后会一直运行, 重启后也会自动运行"
+	echo "           测试模块可选, 默认使用该模块第一个可选参数启动测试."
+	echo "           网络模块默认不启动, 启动网络模块时, 必须输入 --role 选项设定本机角色(a/b), 另一端的设备设定相对的角色(b/a)."
+	echo "           io  测试模块参数 disk: 硬盘; raid: 卷组"
+	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路"
+	echo "           cpu 测试模块参数 full: 全速运行"
+	echo "           参数 'none' 表示不启动该测试模块"
+	echo ""
+	echo "       $prog_name --stop"
+	echo "           停止当前测试, 系统重启后会自动启动测试"
+	echo ""
+	echo "       $prog_name --remove"
+	echo "           停止测试, 删除测试程序"
+	echo ""
+	echo "       $prog_name --status"
+	echo "           查看测试程序运行状态"
+	echo ""
+	echo "       $prog_name --help"
+	exit 1
+}
+
+check_arg_io()
+{
+	if [ "$io" != "disk" -a "$io" != "raid" -a "$io" != "none" ]; then
+		echo "--io 参数错误"
+		return 1
+	else
+		return 0
+	fi
+}
+
+check_arg_net()
+{
+	if [ "$net" != "both" -a "$net" != "transmit" -a "$net" != "receive" -a "$net" != "none" ]; then
+		echo "--net 参数错误"
+		return 1
+	elif [ "$net" != "none" -a "$role" != "a" -a "$role" != "b" ]; then
+		echo "--role 参数错误"
+		return 1
+	else
+		return 0
+	fi
+}
+
+check_arg_cpu()
+{
+	if [ "$cpu" != "full" -a "$cpu" != "none" ]; then
+		echo "--cpu 参数错误"
+		return 1
+	else
+		return 0
+	fi
+}
+
+test_io()
+{
+	local file
+	local prefix
+	local sys_disk
+	
+	sys_disk=`mount -l | grep " / " | cut -d ' ' -f 1 | tr -d [:digit:]`
+	sys_disk=`basename $sys_disk`
+
+	if [ "$io" = "disk" ]; then
+		prefix="sd"
+	else
+		prefix="md"
+	fi
+	disks=`ls /sys/block | grep $prefix | grep -v "$sys_disk"`
+	for disk in $disks
+	do
+		file=/tmp/.${prog_name}_io_$disk
+		cat << EOF >$file
+#!/bin/sh
+while true
+do
+	dd if=/dev/zero of=/dev/$disk bs=1M >/dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M >/dev/null 2>&1
+done
+EOF
+		chmod +x $file
+		$file &
+	done
+}
+
+test_net()
+{
+	local i
+	local eth
+	local eths
+	local str
+	local file
+	local host_addr_local
+	local host_addr_remote
+	
+	eths=`ls /sys/class/net | grep "eth[1-9]"`
+	
+	if [ "$role" = "a" ]; then
+		host_addr_local=1
+		host_addr_remote=2
+	else
+		host_addr_local=2
+		host_addr_remote=1
+	fi
+	
+	if [ "$net" != "transmit" ]; then
+		file="/tmp/.${prog_name}_net_receive"
+		echo "#!/bin/sh" >$file
+		for eth in $eths
+		do
+			i=`echo $eth | tr -d "eth"`
+			echo "ifconfig $eth 192.168.$i.$host_addr_local" >>$file
+		done
+		
+		echo "iperf -s -l 100000 >/dev/null 2>&1" >>$file
+		chmod +x $file
+		$file &
+	fi
+
+	if [ "$net" = "receive" ]; then
+		return
+	fi
+	
+	for eth in $eths
+	do
+		i=`echo $eth | tr -d "eth"`
+		file="/tmp/.${prog_name}_net_transmit_$eth"
+		cat << EOF >$file
+#!/bin/sh
+ifconfig $eth 192.168.$i.$host_addr_local
+
+while true
+do
+	iperf -c 192.168.$i.$host_addr_remote -l 100000 -t 3600 >/dev/null 2>&1
+	sleep 5
+done
+EOF
+		chmod +x $file
+		$file &
+	done
+}
+
+test_cpu()
+{
+	local file
+	local cpuid
+	local cpuids
+	cpuids=`cat /proc/cpuinfo | grep processor | awk '{ print $3 }'`
+	for cpuid in $cpuids
+	do
+		file=/tmp/.${prog_name}_cpu_$cpuid
+		cat << EOF >$file
+#!/bin/sh
+yes >/dev/null
+EOF
+		chmod +x $file
+		$file &
+	done
+}
+
+stop()
+{
+	local file
+	local files
+	local pid
+	
+	rm -f $status_file
+	
+	pid=`ps -ef | grep "${prog_name} --monitor" | grep -v "grep" | awk '{ print $2 }'`
+	if [ ! -z "$pid" ]; then
+		kill -9 $pid
+	fi
+
+	cd /tmp
+	files=`ls .${prog_name}_* 2>/dev/null`
+	rm -f .${prog_name}_*
+	for file in $files
+	do
+		killall $file >/dev/null 2>&1
+	done
+	
+	killall dd >/dev/null 2>&1
+	killall iperf >/dev/null 2>&1
+	killall yes >/dev/null 2>&1
+}
+
+remove()
+{
+	stop
+	sed -i /"$prog_name"/d /etc/rc.local
+	sed -i /"$prog_name"/d /etc/crontab
+	
+	rm -f `echo $cmdline | cut -d ' ' -f 1`
+}
+
+monitor()
+{
+	local files
+	local file
+	local procs
+	
+	cd /tmp
+	procs=`ps -ef | grep ".${prog_name}_"`
+	files=`ls .${prog_name}_*`
+	for file in $files
+	do
+		if ! echo $procs | grep -q $file; then
+			$file &
+		fi
+	done
+}
+
+status()
+{
+	if [ -f $status_file ]; then
+		cat $status_file
+	else
+		echo "$prog_name 没有运行"
+	fi
+}
+
+################################# 主程序开始 ###################################
+prog_name=`basename $0`
+if echo $0 | grep -q "^/"; then
+	cmdline="$0 $@"
+else
+	cmdline="$PWD/$0 $@"
+fi
+status_file="/tmp/.status_$prog_name"
+
+role=""
+io="disk"
+net="none"
+cpu="full"
+
+if [ ! -z "$1" ]; then
+	if [ "$1" = "--stop" ]; then
+		stop
+		exit 0
+	elif [ "$1" = "--remove" ]; then
+		remove
+		exit 0
+	elif [ "$1" = "--monitor" ]; then
+		monitor
+		exit 0
+	elif [ "$1" = "--status" ]; then
+		status
+		exit 0
+	elif [ "$1" = "--help" ]; then
+		usage
+		exit 0
+	fi
+fi
+
+while [ ! -z "$1" ]
+do
+	case "$1" in
+		--role)
+		role=$2
+		shift
+		;;
+		--io)
+		io=$2
+		shift
+		;;
+		--net)
+		net=$2
+		shift
+		;;
+		--cpu)
+		cpu=$2
+		shift
+		;;
+		*)
+		usage
+		exit 1
+		;;
+	esac
+	shift
+done
+
+check_ok=0
+check_arg_io && check_arg_net && check_arg_cpu && check_ok=1
+if [ $check_ok -ne 1 ]; then
+	usage
+	exit 1
+fi
+
+if [ -f $status_file ]; then
+	cat $status_file
+	echo "请先停止之前的测试, 再启动新的测试"
+	exit 0
+fi
+
+cat << EOF >$status_file
+$prog_name 正在运行
+启动时间: `date "+%Y/%m/%d %H:%M:%S"`
+运行参数: io=$io; net=$net; role=$role; cpu=$cpu
+EOF
+
+if ! grep -q "$prog_name" /etc/rc.local; then
+	echo "$cmdline &" >>/etc/rc.local
+	echo "0,15,30,45 * * * * $PWD/$prog_name --monitor" >>/etc/crontab
+fi
+
+[ "$io" != "none" ] && test_io&
+[ "$net" != "none" ] && test_net&
+[ "$cpu" != "none" ] && test_cpu&
