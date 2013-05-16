@@ -1,28 +1,41 @@
 #!/bin/sh
 
+version()
+{
+	echo "$prog_name - v1.1 - 20130516 10:39"
+}
+
 usage()
 {
-	echo "usage: $prog_name [--io <disk|raid|none>] [--net <none|both|transmit|receive> --role <a|b>] [--cpu <full|none>]"
-	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡按顺序一对一直连, 例如: '设备a' 的 'LAN1' 和 '设备b' 的 'LAN1' 连接"
+	echo ""
+	version
+	echo "usage:"
+	echo "    $prog_name [--io <disk|raid|none> [--part path]]"
+	echo "        [--net <none|both|transmit|receive> --role <a|b> [--eth0-remote-ip ip]]"
+	echo "        [--cpu <full|none>]"
+	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡(第一个网卡除外)按顺序一对一直连, 例如: '设备a' 的 'LAN1' 和 '设备b' 的 'LAN2' 连接"
 	echo "           测试启动后会一直运行, 重启后也会自动运行"
-	echo "           测试模块可选, 默认使用该模块第一个可选参数启动测试."
-	echo "           网络模块默认不启动, 启动网络模块时, 必须输入 --role 选项设定本机角色(a/b), 另一端的设备设定相对的角色(b/a)."
-	echo "           io  测试模块参数 disk: 硬盘; raid: 卷组"
-	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路"
+	echo "           测试模块可选, 默认使用该模块第一个可选参数启动测试"
+	echo "           网络模块默认不启动, 启动网络模块时, 必须输入 --role 选项设定本机角色(a/b), 另一端的设备设定相对的角色(b/a)"
+	echo "           io  测试模块参数 disk: 硬盘; raid: 卷组. 自动扫描所有硬盘(系统盘除外)或卷组测试."
+	echo "               如果需要测试系统盘, 在系统盘上新建空闲分区, 输入'--part path'测试, path为分区完整路径, 如/dev/sda2"
+	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路. 自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
+	echo "               如果需要测试第一个网卡eth0, 需要输入'--eth0-remote-ip ip'指定对端的ip地址"
 	echo "           cpu 测试模块参数 full: 全速运行"
 	echo "           参数 'none' 表示不启动该测试模块"
 	echo ""
 	echo "       $prog_name --stop"
-	echo "           停止当前测试, 系统重启后会自动启动测试"
+	echo "           仅停止当前测试, 系统重启后会自动启动测试"
 	echo ""
 	echo "       $prog_name --remove"
-	echo "           停止测试, 删除测试程序"
+	echo "           停止测试, 系统重启后不再自动启动测试"
 	echo ""
 	echo "       $prog_name --status"
 	echo "           查看测试程序运行状态"
 	echo ""
 	echo "       $prog_name --help"
-	exit 1
+	echo ""
+	echo "       $prog_name --version"
 }
 
 check_arg_io()
@@ -30,9 +43,21 @@ check_arg_io()
 	if [ "$io" != "disk" -a "$io" != "raid" -a "$io" != "none" ]; then
 		echo "--io 参数错误"
 		return 1
-	else
-		return 0
 	fi
+	
+	if [ "x$part" != "x" ]; then
+		if mount -l | grep " / " | grep -q "$part"; then
+			echo "$part为系统分区, 不能做io测试"
+			return 1
+		fi
+		
+		if [ ! -b $part ] || ls /sys/block | grep -q `basename $part`; then
+			echo "$part不是分区"
+			return 1
+		fi
+	fi
+
+	return 0
 }
 
 check_arg_net()
@@ -43,9 +68,15 @@ check_arg_net()
 	elif [ "$net" != "none" -a "$role" != "a" -a "$role" != "b" ]; then
 		echo "--role 参数错误"
 		return 1
-	else
-		return 0
 	fi
+
+	if [ "x$eth0_remote_ip" != "x" ]; then
+		if ! ping -c 4 $eth0_remote_ip >/dev/null; then
+			echo "ip地址 $eth0_remote_ip 不通, 请检查ip地址是否正确, 或网络连接是否正常"
+			return 1
+		fi
+	fi
+	return 0
 }
 
 check_arg_cpu()
@@ -73,6 +104,9 @@ test_io()
 		prefix="md"
 	fi
 	disks=`ls /sys/block | grep $prefix | grep -v "$sys_disk"`
+	if [ "x$part" != "x" ]; then
+		disks="$disks `basename $part`"
+	fi
 	for disk in $disks
 	do
 		file=/tmp/.${prog_name}_io_$disk
@@ -144,6 +178,20 @@ EOF
 		chmod +x $file
 		$file &
 	done
+	
+	# 单独处理eth0的发包测试
+	file="/tmp/.${prog_name}_net_transmit_eth0"
+			cat << EOF >$file
+#!/bin/sh
+
+while true
+do
+	iperf -c $eth0_remote_ip -l 100000 -t 3600 >/dev/null 2>&1
+	sleep 5
+done
+EOF
+		chmod +x $file
+		$file &
 }
 
 test_cpu()
@@ -187,6 +235,7 @@ stop()
 	
 	killall dd >/dev/null 2>&1
 	killall iperf >/dev/null 2>&1
+	killall iperf >/dev/null 2>&1
 	killall yes >/dev/null 2>&1
 }
 
@@ -195,8 +244,6 @@ remove()
 	stop
 	sed -i /"$prog_name"/d /etc/rc.local
 	sed -i /"$prog_name"/d /etc/crontab
-	
-	rm -f `echo $cmdline | cut -d ' ' -f 1`
 }
 
 monitor()
@@ -225,6 +272,16 @@ status()
 	fi
 }
 
+check_param()
+{
+	local op=$1
+	local param=$2
+	if [ "x$param" = "x" ] || echo $param | grep -q "^--"; then
+		echo "选项 $op 参数为空"
+		param_error=1
+	fi
+}
+
 ################################# 主程序开始 ###################################
 prog_name=`basename $0`
 if echo $0 | grep -q "^/"; then
@@ -234,10 +291,13 @@ else
 fi
 status_file="/tmp/.status_$prog_name"
 
+param_error=0
 role=""
 io="disk"
 net="none"
 cpu="full"
+eth0_remote_ip=""
+part=""
 
 if [ ! -z "$1" ]; then
 	if [ "$1" = "--stop" ]; then
@@ -255,29 +315,47 @@ if [ ! -z "$1" ]; then
 	elif [ "$1" = "--help" ]; then
 		usage
 		exit 0
+	elif [ "$1" = "--version" ]; then
+		version
+		exit 0
 	fi
 fi
 
-while [ ! -z "$1" ]
+while [ ! -z "$1" -a $param_error -ne 1 ]
 do
 	case "$1" in
 		--role)
 		role=$2
+		check_param $1 $2
 		shift
 		;;
 		--io)
 		io=$2
+		check_param $1 $2
 		shift
 		;;
 		--net)
 		net=$2
+		check_param $1 $2
 		shift
 		;;
 		--cpu)
 		cpu=$2
+		check_param $1 $2
+		shift
+		;;
+		--eth0-remote-ip)
+		eth0_remote_ip=$2
+		check_param $1 $2
+		shift
+		;;
+		--part)
+		part=$2
+		check_param $1 $2
 		shift
 		;;
 		*)
+		echo "错误的选项或参数 $1"
 		usage
 		exit 1
 		;;
@@ -285,11 +363,21 @@ do
 	shift
 done
 
+if [ $param_error -ne 0 ]; then
+	usage
+	exit 1
+fi
+
 check_ok=0
 check_arg_io && check_arg_net && check_arg_cpu && check_ok=1
 if [ $check_ok -ne 1 ]; then
 	usage
 	exit 1
+fi
+
+if [ "$io" = "none" ] && [ "$net" = "none" ] && [ "$cpu" = "none" ]; then
+	echo "没有指定测试模块, 程序退出"
+	exit 0
 fi
 
 if [ -f $status_file ]; then
@@ -301,7 +389,7 @@ fi
 cat << EOF >$status_file
 $prog_name 正在运行
 启动时间: `date "+%Y/%m/%d %H:%M:%S"`
-运行参数: io=$io; net=$net; role=$role; cpu=$cpu
+运行参数: io=$io, part=$part; net=$net, role=$role, eth0_remote_ip=$eth0_remote_ip; cpu=$cpu
 EOF
 
 if ! grep -q "$prog_name" /etc/rc.local; then
@@ -312,3 +400,5 @@ fi
 [ "$io" != "none" ] && test_io&
 [ "$net" != "none" ] && test_net&
 [ "$cpu" != "none" ] && test_cpu&
+
+cat $status_file
