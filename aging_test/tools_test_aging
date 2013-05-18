@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$prog_name - v1.1 - 20130516 10:39"
+	echo "$prog_name - v1.2 - 20130518 16:51"
 }
 
 usage()
@@ -10,9 +10,9 @@ usage()
 	echo ""
 	version
 	echo "usage:"
-	echo "    $prog_name [--io <disk|raid|none> [--part path]]"
-	echo "        [--net <none|both|transmit|receive> --role <a|b> [--eth0-remote-ip ip]]"
-	echo "        [--cpu <full|none>]"
+	echo "    $prog_name [--io disk|raid|none [--part <path>]]"
+	echo "        [--net none|both|transmit|receive --role a|b [--eth0-remote-ip <ip>]]"
+	echo "        [--cpu full|none]"
 	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡(第一个网卡除外)按顺序一对一直连, 例如: '设备a' 的 'LAN1' 和 '设备b' 的 'LAN2' 连接"
 	echo "           测试启动后会一直运行, 重启后也会自动运行"
 	echo "           测试模块可选, 默认使用该模块第一个可选参数启动测试"
@@ -25,7 +25,7 @@ usage()
 	echo "           参数 'none' 表示不启动该测试模块"
 	echo ""
 	echo "       $prog_name --stop"
-	echo "           仅停止当前测试, 系统重启后会自动启动测试"
+	echo "           中止当前测试, 系统重启后会自动启动测试"
 	echo ""
 	echo "       $prog_name --remove"
 	echo "           停止测试, 系统重启后不再自动启动测试"
@@ -217,7 +217,8 @@ stop()
 	local file
 	local files
 	local pid
-	
+	local op=$1
+
 	rm -f $status_file
 	
 	pid=`ps -ef | grep "${prog_name} --monitor" | grep -v "grep" | awk '{ print $2 }'`
@@ -237,11 +238,17 @@ stop()
 	killall iperf >/dev/null 2>&1
 	killall iperf >/dev/null 2>&1
 	killall yes >/dev/null 2>&1
+	
+	if [ "$op" = "forever" ]; then
+		logger -t [$prog_name] "停止测试"
+	else
+		logger -t [$prog_name] "中止测试"
+	fi
 }
 
 remove()
 {
-	stop
+	stop "forever"
 	sed -i /"$prog_name"/d /etc/rc.local
 	sed -i /"$prog_name"/d /etc/crontab
 }
@@ -266,6 +273,7 @@ monitor()
 status()
 {
 	if [ -f $status_file ]; then
+		echo "$prog_name 正在运行"
 		cat $status_file
 	else
 		echo "$prog_name 没有运行"
@@ -381,16 +389,19 @@ if [ "$io" = "none" ] && [ "$net" = "none" ] && [ "$cpu" = "none" ]; then
 fi
 
 if [ -f $status_file ]; then
+	cat "$prog_name 已经运行"
 	cat $status_file
 	echo "请先停止之前的测试, 再启动新的测试"
 	exit 0
 fi
 
 cat << EOF >$status_file
-$prog_name 正在运行
 启动时间: `date "+%Y/%m/%d %H:%M:%S"`
 运行参数: io=$io, part=$part; net=$net, role=$role, eth0_remote_ip=$eth0_remote_ip; cpu=$cpu
 EOF
+
+logger -t [$prog_name] "开始测试"
+cat $status_file | logger -t [$prog_name]
 
 if ! grep -q "$prog_name" /etc/rc.local; then
 	echo "$cmdline &" >>/etc/rc.local
@@ -401,4 +412,5 @@ fi
 [ "$net" != "none" ] && test_net&
 [ "$cpu" != "none" ] && test_cpu&
 
+echo "$prog_name 开始测试"
 cat $status_file
