@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$prog_name - v1.2 - 20130518 16:51"
+	echo "$prog_name - v1.3 - 20130927 13:34"
 }
 
 usage()
