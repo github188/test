@@ -20,9 +20,11 @@ usage()
 	echo "           网络模块默认不启动, 启动网络模块时, 必须输入 --role 选项设定本机角色(a/b), 另一端的设备设定相对的角色(b/a)"
 	echo "           io  测试模块参数 disk: 硬盘; raid: 卷组. 自动扫描所有硬盘(系统盘除外)或卷组测试."
 	echo "               如果需要测试系统盘, 在系统盘上新建空闲分区, 输入'--part path'测试, path为分区完整路径, 如/dev/sda2"
-	echo "               在测试期间如果磁盘、分区、或者raid发生异常， 在每小时的0，15，30，45分钟时会对相应的io设备进行累计错误计数 "	
-        echo "	             在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
-	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路. 自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
+	echo "               在测试期间如果磁盘、分区、或者raid发生异常， 在每小时的0，15，30，45分钟时会对相应的io设备"
+	echo "               进行累计错误计数 "	
+    echo "	             在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
+	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路." 
+	echo "               自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
 	echo "               如果需要测试第一个网卡eth0, 需要输入'--eth0-remote-ip ip'指定对端的ip地址"
 	echo "               在测试期间如果网络发生异常,在每小时的0,15,30,45分钟会对相应的网络设备进行累计错误计数"
 	echo "               如果net的参数为receive不进行累计错误的计数"
@@ -227,7 +229,7 @@ test_cpu()
 		file=/tmp/.${PROG_NAME}_cpu_$cpuid
 		cat << EOF >$file
 #!/bin/sh
-	yes >/dev/null
+yes >/dev/null
 EOF
 		chmod +x $file
 		$file &
