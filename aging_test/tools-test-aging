@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$PROG_NAME - v1.3 - 20130927 13:34"
+	echo "$PROG_NAME - v1.4 - 20131023 18:34"
 }
 
 usage()
@@ -22,7 +22,7 @@ usage()
 	echo "               如果需要测试系统盘, 在系统盘上新建空闲分区, 输入'--part path'测试, path为分区完整路径, 如/dev/sda2"
 	echo "               在测试期间如果磁盘、分区、或者raid发生异常， 在每小时的0，15，30，45分钟时会对相应的io设备"
 	echo "               进行累计错误计数 "	
-    echo "	             在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
+	echo "               在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
 	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路." 
 	echo "               自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
 	echo "               如果需要测试第一个网卡eth0, 需要输入'--eth0-remote-ip ip'指定对端的ip地址"
@@ -38,10 +38,10 @@ usage()
 	echo "           查看测试程序启动时间、启动的参数、相关模块累计的错误信息"
 	echo ""
 	echo "       $PROG_NAME --help"
-	echo "            显示此帮助文档"
+	echo "           显示此帮助文档"
 	echo ""	
 	echo "       $PROG_NAME --version"
-	echo "            显示版本信息"
+	echo "           显示版本信息"
 }
 
 check_arg_io()
@@ -248,7 +248,7 @@ stop()
 	do
 		pid=`ps -ef | grep "${PROG_NAME} --monitor" | grep -v "grep" | awk '{ print $2 }'`
 		if [ ! -z "$pid" ];then
-			if [ count -ge 0 ];then
+			if [ $count -ge 0 ];then
 				sleep 1
 				count=$((count-1))
 			else
@@ -377,10 +377,12 @@ check_param()
 ################################# 主程序开始 ###################################
 PROG_NAME=`basename $0`
 if echo $0 | grep -q "^/"; then
-	CMDLINE="$0 $@"
+	CMDPATH="$0"
 else
-	CMDLINE="$PWD/$0 $@"
+	CMDPATH="$PWD/$0"
 fi
+CMDLINE="$@"
+
 RUN_STATUS_FILE="/tmp/.status_$PROG_NAME"
 PARAM_ERROR=0
 ROLE=""
@@ -456,7 +458,6 @@ if [ $PARAM_ERROR -ne 0 ]; then
 	usage
 	exit 1
 fi
-
 check_ok=0
 check_arg_io && check_arg_net && check_arg_cpu && check_ok=1
 if [ $check_ok -ne 1 ]; then
@@ -480,7 +481,6 @@ cat << EOF >$RUN_STATUS_FILE
 启动时间: `date "+%Y/%m/%d %H:%M:%S"`
 运行参数: io=$IO, part=$PART; net=$NET, role=$ROLE, eth0_remote_ip=$ETH0_REMOTE_IP; cpu=$CPU
 EOF
-
 #判断异常重启次数
 if [ -f "$ERROR_STATUS_FILE" ]; then
 	n=`cat $ERROR_STATUS_FILE|sed -n '/abnormal_reboot/'p|awk -F = '{print $2}'`
@@ -497,8 +497,8 @@ logger -t [$PROG_NAME] "开始测试"
 cat $RUN_STATUS_FILE | logger -t [$PROG_NAME]
 
 if ! grep -q "$PROG_NAME" /etc/rc.local; then
-	echo "$CMDLINE &" >>/etc/rc.local
-	echo "0,15,30,45 * * * * root $PWD/$PROG_NAME --monitor" >>/etc/crontab
+	echo "$CMDPATH $CMDLINE &" >>/etc/rc.local
+	echo "0,15,30,45 * * * * root $CMDPATH --monitor" >>/etc/crontab
 	chmod +x /etc/rc.local
 fi
 
