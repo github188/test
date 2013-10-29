@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$PROG_NAME - v1.4 - 20131023 18:34"
+	echo "$PROG_NAME - v1.4 - 20131029 17:01"
 }
 
 usage()
@@ -10,9 +10,9 @@ usage()
 	echo ""
 	version
 	echo "usage:"
-	echo "    $PROG_NAME [--io disk|raid|none [--part <path>]]"
+	echo "    $PROG_NAME [--io none|disk|raid [--part <path>]]"
 	echo "        [--net none|both|transmit|receive --role a|b [--eth0-remote-ip <ip>]]"
-	echo "        [--cpu full|none]"
+	echo "        [--cpu none|full]"
 	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡(第一个网卡除外)按顺序一对一直连,"
 	echo "           例如: '设备a' 的 'LAN1' 和 '设备b' 的 'LAN1' 连接"
 	echo "           测试启动后会一直运行, 重启后也会自动运行"
@@ -386,9 +386,9 @@ CMDLINE="$@"
 RUN_STATUS_FILE="/tmp/.status_$PROG_NAME"
 PARAM_ERROR=0
 ROLE=""
-IO="disk"
+IO="none"
 NET="none"
-cpu="full"
+CPU="none"
 ETH0_REMOTE_IP=""
 PART=""
 SYS_DISK=""
@@ -467,6 +467,7 @@ fi
 
 if [ "$IO" = "none" ] && [ "$NET" = "none" ] && [ "$CPU" = "none" ]; then
 	echo "没有指定测试模块, 程序退出"
+	usage	
 	exit 0
 fi
 
