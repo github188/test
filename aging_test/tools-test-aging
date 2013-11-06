@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$PROG_NAME - v1.4 - 20131029 17:01"
+	echo "$PROG_NAME - v1.4 - 20131105 14:01"
 }
 
 usage()
@@ -21,13 +21,13 @@ usage()
 	echo "           io  测试模块参数 disk: 硬盘; raid: 卷组. 自动扫描所有硬盘(系统盘除外)或卷组测试."
 	echo "               如果需要测试系统盘, 在系统盘上新建空闲分区, 输入'--part path'测试, path为分区完整路径, 如/dev/sda2"
 	echo "               在测试期间如果磁盘、分区、或者raid发生异常， 在每小时的0，15，30，45分钟时会对相应的io设备"
-	echo "               进行累计错误计数 "	
+	echo "               进行累计错误计数 如果出现故障蜂鸣器会报警"
 	echo "               在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
 	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路." 
 	echo "               自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
 	echo "               如果需要测试第一个网卡eth0, 需要输入'--eth0-remote-ip ip'指定对端的ip地址"
 	echo "               在测试期间如果网络发生异常,在每小时的0,15,30,45分钟会对相应的网络设备进行累计错误计数"
-	echo "               如果net的参数为receive不进行累计错误的计数"
+	echo "               如果net的参数为receive不进行累计错误的计数 如果出现故障蜂鸣器会报警"
 	echo "           cpu 测试模块参数full: 全速运行"
 	echo "               参数 'none' 表示不启动该测试模块"
 	echo ""
@@ -35,7 +35,7 @@ usage()
 	echo "           结束测试,显示累计错误,系统重启后不再自动启动测试"
 	echo ""
 	echo "       $PROG_NAME --status"
-	echo "           查看测试程序启动时间、启动的参数、相关模块累计的错误信息"
+	echo "           查看测试程序启动时间、启动的参数、相关模块累计的错误信息,当前有故障的模块信息"
 	echo ""
 	echo "       $PROG_NAME --help"
 	echo "           显示此帮助文档"
@@ -139,6 +139,20 @@ EOF
 			echo "io_${disk}_errors=0" >> $ERROR_STATUS_FILE
 		fi
 	done
+	file=/tmp/.${PROG_NAME}_io_mem
+	cat << EOF >$file
+#!/bin/sh
+while true
+do
+	sync
+	echo 3>/proc/sys/vm/drop_caches
+	dd if=/dev/zero of=$IO_MEM bs=1M count=8096 >/dev/null 2>&1
+	dd if=$IO_MEM of=/dev/zero bs=1M count=8096 >/dev/null 2>&1
+	sleep 180
+done
+EOF
+	chmod +x $file
+	$file &
 }
 
 test_net()
@@ -200,9 +214,10 @@ EOF
 		fi
 	done
 
+	if [ ! -z $ETH0_REMOTE_IP ];then
 	# 单独处理eth0的发包测试
-	file="/tmp/.${PROG_NAME}_net_transmit_eth0"
-	cat << EOF >$file
+		file="/tmp/.${PROG_NAME}_net_transmit_eth0"
+		cat << EOF >$file
 #!/bin/sh
 
 while true
@@ -211,10 +226,12 @@ do
 	sleep 5
 done
 EOF
-	chmod +x $file
-	$file &
-	if [ $REBOOTTIMES -eq 0 ];then
-		echo "net_eth0_errors=0" >> $ERROR_STATUS_FILE
+		chmod +x $file
+		$file &
+		if [ $REBOOTTIMES -eq 0 ];then
+			echo "net_eth0_errors=0" >> $ERROR_STATUS_FILE
+		fi
+
 	fi
 }
 
@@ -279,15 +296,15 @@ stop()
 
 	if [ -f "$ERROR_STATUS_FILE" ];then
 		echo ""
-		cat $ERROR_STATUS_FILE | sed 's/=/\t/g'
 		sed -i 's/running/stop/g' $ERROR_STATUS_FILE >/dev/null 2>&1
+		grep -v "IOERROR" $ERROR_STATUS_FILE | grep -v "NETERROR"
 		echo ""
 		rm -I /tmp/.aging-test-status > /dev/null 2>&1
 		mv $ERROR_STATUS_FILE $ERROR_STATUS_FILE`date "+%Y%m%d%H%M%S"` >/dev/null 2>&1
 	else
 		echo "$PROG_NAME 没有运行！"
 	fi
-
+	rm -f $IO_MEM
 	rm -f $RUN_STATUS_FILE
 }
 
@@ -300,6 +317,9 @@ monitor()
 	local tmpfile=/tmp/.aging-test-status
 	local disk
 	local prog_nam
+	local err_str=""
+	local io_errno=0
+	local net_errno=0
 	prog_nam=`basename $0`
 	
 	##io错误
@@ -318,9 +338,11 @@ monitor()
 		if [ -z "$tmpvar" ];  then
 			sed -i "s/${disk}.*/${orgdisk}_errors=$((monitor_io_errors+1)) 未检测到硬盘/" $ERROR_STATUS_FILE
 			logger -t [$prog_nam] "$disk 发生io错误 未检测到硬盘"
+			io_errno=1
 		elif [ ! -z `echo $tmpvar | awk '{if ($2<=10&&$3<=10) print $1}'` ];then
 			sed -i "s/${disk}.*/${orgdisk}_errors=$((monitor_io_errors+1))/" $ERROR_STATUS_FILE
 			logger -t [$prog_nam] "$disk 发生io错误"
+			io_errno=1
 		else
 			sed -i "s/${disk}.*/${orgdisk}_errors=${monitor_io_errors}/" $ERROR_STATUS_FILE
 		fi
@@ -337,8 +359,35 @@ monitor()
 		if [ ! -z "$tmpvar" ]; then
 			sed -i "s/${monitoreth}_errors=.*/${monitoreth}_errors=$((monitor_errors+1))/" $ERROR_STATUS_FILE
 			logger -t [$prog_nam] "$monitoreth 发生网络错误"
+			net_errno=1
+
 		fi
 	done
+	
+	if [ $io_errno -ne 0 -o $net_errno -ne 0 ]; then
+		if [ -f "/usr/local/bin/set-buzzer.sh" ]; then
+			set-buzzer.sh on
+		fi
+	fi
+	if [ $io_errno -ne 0 ]; then
+		echo "tools-test-aging warning: IO error!" | tee /dev/tty0 /dev/pts/[0-9]* 
+		if ! grep -q "IOERROR" $ERROR_STATUS_FILE; then
+			echo "IOERROR" >> $ERROR_STATUS_FILE
+		fi
+	else
+		sed -i '/IOERROR/d' $ERROR_STATUS_FILE
+	fi
+	if [ $net_errno -ne 0 ]; then
+		echo "tools-test-aging warning: Net error!" | tee /dev/tty0 /dev/pts/[0-9]* 
+		if ! grep -q "NETERROR" $ERROR_STATUS_FILE;then
+			echo "NETERROR" >> $ERROR_STATUS_FILE
+		fi
+	else
+		sed -i '/NETERROR/d' $ERROR_STATUS_FILE
+	fi
+	
+	
+	
 	
 	#重新启动停掉的进程
 	procs=`ps -ef | grep ".${prog_nam}_"`
@@ -357,8 +406,14 @@ status()
 {
 	if [ -f $RUN_STATUS_FILE ]; then
 		echo "$PROG_NAME 正在运行"
-		cat $RUN_STATUS_FILE
-		cat $ERROR_STATUS_FILE
+		#cat $RUN_STATUS_FILE
+		cat $ERROR_STATUS_FILE | grep -v "IOERROR" | grep -v "NETERROR"
+		if grep -q "IOERROR" $ERROR_STATUS_FILE;then
+			echo "tools-test-aging warning: IO error!"
+		fi
+		if grep -q "NETERROR" $ERROR_STATUS_FILE;then
+			echo "tools-test-aging warning: Net error!"
+		fi
 	else
 		echo "$PROG_NAME 没有运行"
 	fi
@@ -394,6 +449,7 @@ PART=""
 SYS_DISK=""
 ERROR_STATUS_FILE="/var/log/aging-test-status"
 REBOOTTIMES=0
+IO_MEM="/home/tools-test-aging-io-men"
 if [ ! -z "$1" ]; then
 	if [ "$1" = "--stop" ]; then
 		stop
@@ -489,11 +545,12 @@ if [ -f "$ERROR_STATUS_FILE" ]; then
 	REBOOTTIMES=1
 else
 	cat << EOF >$ERROR_STATUS_FILE
+启动时间: `date "+%Y/%m/%d %H:%M:%S"`
+运行参数: io=$IO, part=$PART; net=$NET, role=$ROLE, eth0_remote_ip=$ETH0_REMOTE_IP; cpu=$CPU
 run_status=running
 abnormal_reboot=0
 EOF
 fi
-
 logger -t [$PROG_NAME] "开始测试"
 cat $RUN_STATUS_FILE | logger -t [$PROG_NAME]
 
@@ -509,6 +566,5 @@ fi
 [ "$CPU" != "none" ] && test_cpu&
 
 echo "$PROG_NAME 开始测试"
-cat $RUN_STATUS_FILE
 sleep 2
 cat $ERROR_STATUS_FILE
