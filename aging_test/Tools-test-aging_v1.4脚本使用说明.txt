@@ -1,0 +1,67 @@
+
+Tools-test-aging脚本使用说明
+1、测试开始前：
+a)检查磁盘是否在线，网络是否全部连接（设备a和设备b除第一个网卡外，其它网卡一对一直连）
+
+b)把脚本tools-test-aging文件上传 /usr/local/bin/ 目录下,运行命令 
+chmod +x /usr/local/bin/tools-test-aging
+对脚本加上运行权限
+
+2、测试开始：
+a)在机器a上运行命令
+  tools-test-aging --io disk --cpu full --net both --role a --eth0-remote-ip IP (IP为机器b的ip地址)
+b)在机器b上运行命令
+  tools-test-aging --io disk --cpu full --net both --role b --eth0-remote-ip IP (IP为机器a的ip地址)
+
+3、运行脚本过程中：
+如果需要查看测试程序启动时间、启动的参数、相关模块累计的错误信息、当前有故障的模块信息，运行命令 tools-test-aging –status
+例：
+tools-test-aging 正在运行
+启动时间: 2013/11/11 10:14:08
+运行参数: io=disk, part=; net=both, role=a, eth0_remote_ip=192.168.70.60; cpu=full
+run_status=running
+abnormal_reboot=0
+io_sdb_errors=0
+io_sdc_errors=0
+io_sdd_errors=0
+io_sde_errors=0
+io_sdf_errors=0
+io_sdg_errors=0
+net_eth1_errors=1
+net_eth2_errors=1
+net_eth3_errors=1
+net_eth4_errors=1
+net_eth0_errors=1
+如果脚本运行过程中重启了服务器，在 tools-test-aging --status 中 abnormal_reboot 会加一次计数。
+如果出现错误看下面的错误指南。
+
+4、脚本的终止 ：
+运行tools-test-aging --stop来终止脚本的运行
+例：
+run_status running
+abnormal_reboot 0
+io_sdb_errors   0
+io_sdc_errors   0
+io_sdd_errors   0
+io_sde_errors   0
+io_sdf_errors   0
+io_sdg_errors   0
+net_eth1_errors 1
+net_eth2_errors 1
+net_eth3_errors 1
+net_eth4_errors 1
+net_eth0_errors 1
+
+
+错误指南：
+如果在测试过程中发生了错误：
+1．蜂鸣器会报警
+2．屏幕上会出现相关的报警信息。比如：
+网络发生了故障，在屏幕上会显示
+tools-test-aging warning: NET error !  
+磁盘发生了故障，在屏幕上会显示
+tool-test-aging warning: IO error !
+3．如果想查看详细的错误信息，请运行tools-test-aging --status，可以查看具体哪个设备发生了故障 
+4. 如果发生了故障请根据上面的信息排除错误，运行set-buzzer.sh off 可以手动关闭蜂鸣器，排除故障之后，请终止脚本并重新运行。
+
+
