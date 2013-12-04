@@ -9,6 +9,9 @@
 #include "comm.h"
 #include "list.h"
 
+
+int dir_mounted(char *);
+int dir_enough_space(char *);
 int check_fs(char *root_dir, struct dirsname *);
 int get_dirs(char *root_dir, struct dirsname *);
 void print_usage(void);

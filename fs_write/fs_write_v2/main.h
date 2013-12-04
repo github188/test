@@ -9,8 +9,8 @@
 
 
 struct dirsname *dirsp=NULL;
-long int file_size = 524288000;
+long int file_size = 268435456;
 int thread_n = 4;
-int time_s = 120;
+/* int time_s = 120; */
 
 static int  n, now=0;

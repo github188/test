@@ -1,46 +1,73 @@
 #include "parse_args.h"
-/*检查子目录是否挂载了文件系统*/
-int check_fs(char *root_dir, struct dirsname *dirsp)
+/*检查目录是否挂载文件系统*/
+int dir_mounted(char *dirname)
 {
-	int  flag;
+	FILE *fp;
 	char buf[500];
 	char path[300];
-	FILE *fp;
-	struct dirsname *tmp;
-	struct statfs statbuf;
 
 	if ((fp = fopen("/proc/mounts", "r")) == NULL) {
 		fprintf(stderr, "Can't open /proc/mounts!\n");
 		return -1;
 	}
-	tmp = dirsp->next;
-	while (tmp != dirsp){
-		flag = 0;
-		strcpy(path,root_dir);
-		strcat(path, "/");
-		strcat(path, tmp->name);
-		fseek(fp, 0, SEEK_SET);
-		while(fgets(buf, 499, fp) > 0) {
-			if(strstr(buf, path) != NULL) {
-				flag = 1;
-				break;
-			}
+	strcpy(path, root_dir);
+	strcat(path, "/");
+	strcat(path, dirname);
+	while (fgets(buf, 499, fp) > 0) {
+		if (strstr(buf, path) != NULL) {
+			fclose(fp);
+			return 0;
 		}
-		if (!flag) {
-			if (list_del(dirsp, tmp->name) < 0){
-				return -1;
-			}
-		}
+	}
+	fclose(fp);
+	return 1;
 
-		/*判断文件系统是否有足够的空间*/
+}
+int dir_enough_space(char *dirname)
+{
+	struct statfs statbuf;
+	char path[300];
+
+	strcpy(path, root_dir);
+	strcat(path, "/");
+	strcat(path, dirname);
+
+	/*判断文件系统是否有足够的空间*/
 		if (statfs(path, &statbuf) < 0) {
 			fprintf(stderr, "%s can't statfs!\n", path);
 			return -1;
 		}
 		if (statbuf.f_blocks * statbuf.f_bsize < BLOCK_SIZE * thread_n) {
-			if (list_del(dirsp, tmp->name) < 0) {
+			if (list_del(dirsp, dirname) < 0) {
 				return -1;
 			}
+			/*fprintf(stderr, "%s have no enough space to run all threads\n", tmp->name);
+			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
+			  syslog(LOG_USER|LOG_ERR, "%s have no enough space to run all threads\n", tmp->name);*/
+		}
+	return 0;
+
+}
+int check_fs(char *root_dir, struct dirsname *dirsp)
+{
+	struct dirsname *tmp;
+	int ret;
+
+	tmp = dirsp->next;
+	while (tmp != dirsp){
+
+
+		if (dir_mounted(tmp->name) > 0) {
+			if (list_del(dirsp, tmp->name) < 0){
+				return -1;
+			}
+
+			/*fprintf(stderr, "%s is not mounted a file system!\n", tmp->name);
+			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
+			  syslog(LOG_USER|LOG_ERR, "%s is not mounted a file system!\n", tmp->name); */
+		}
+		if (dir_enough_space(tmp->name) < 0) {
+				return -1;
 		}
 		tmp = tmp->next;
 	}
@@ -66,17 +93,20 @@ int get_dirs(char *root_dir, struct dirsname *dirsp)
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 				/*过滤掉.和..*/
 				/*将链表中没有的目录加到链表中*/
-				if (list_add(dirsp, dp->d_name) < 0) {
-					return -1;
-				} 
-				i++;
+
+				if(dir_mounted(dp->d_name) == 0) {
+					if (list_add(dirsp, dp->d_name) < 0) {
+						return -1;
+					}	
+					i++;
+				}
 			}
 		}
 	}
 
 	closedir(dirp);
 	if (i == 0) {
-		fprintf(stderr, "Don't have any child dir!\n");
+		fprintf(stderr, "Don't have any child dir mounted file system!\n");
 		return -1;
 	}
 	return 0;
@@ -87,7 +117,7 @@ void print_usage(void)
 	printf( "\tfilename: the dir include mountpoints\n" );
 	printf( "\tfilesize: the filesize the unit is M\n" );
 	printf(	"\tthreadn : the number of write thread, should be lower 32\n" );
-	printf(	"\ttimes   : every seconds change the mountpoints to write\n" );
+	/*printf(	"\ttimes   : every seconds change the mountpoints to write\n" ); */
 	printf( "\n");
 }
 int check_threadn(void) {
@@ -177,6 +207,8 @@ int check_dirsp(struct dirsname *dirsp)
 {
 	if (dirsp->next == dirsp){
 		fprintf(stderr, "there is no dirs can to test!\n");
+		openlog("fs_write", LOG_CONS|LOG_PID, 0);
+		syslog(LOG_USER|LOG_ERR, "check_dirsp error! list is empty\n");
 		return -1;
 	}
 	else
@@ -185,17 +217,7 @@ int check_dirsp(struct dirsname *dirsp)
 /*参数解析*/
 int parse_args(char *root_dir, struct dirsname *dirsp)
 {
-
-	if ( get_dirs(root_dir, dirsp) < 0) {
-		return -1;
-	}
-
-	/* printf("n: %d\n", n); */
-	if (check_fs(root_dir, dirsp) < 0) {
-		return -1;
-	}
-	print_dirsp(dirsp);
-	if (check_dirsp(dirsp) < 0) {
+	if (update_list( dirsp) < 0) {
 		return -1;
 	}
 	if (check_threadn() < 0) {

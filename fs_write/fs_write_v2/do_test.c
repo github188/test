@@ -33,7 +33,7 @@ void *_w_thread(void *arg)
 	tnum =(int) ((struct thread_args *)arg)->thread_num;
 	count = file_size/BLOCK_SIZE;
 	while (1) {
- 		tmp = get_fs_dirs(t_dirsp);
+		tmp = get_fs_dirs(t_dirsp);
 		if (tmp == NULL) {
 			fprintf(stderr, "Can't get_fs_dirs!\n");
 			return (void *)-1;
@@ -42,7 +42,7 @@ void *_w_thread(void *arg)
 		strcpy(dirbuf, root_dir);
 		strcat(dirbuf, "/");
 		strcat(dirbuf, tmp->name);
-		
+
 		strcpy(filename, dirbuf);
 		strcat(filename, "/");
 		sprintf(namebuf, "tmp.%d", tnum);
@@ -147,7 +147,7 @@ void *_w_thread(void *arg)
 			syslog(LOG_USER|LOG_ERR, "thread %d's md5 check error!\n",tnum);
 			fprintf(stderr, "MD5 error!\n");
 			return (void *)-1;
-	 	}  
+		}  
 	}
 }
 /*创建写线程*/
@@ -156,7 +156,7 @@ int w_thread (struct dirsname *dirsp)
 	int tid;
 	int err;
 	struct thread_args *t_args[thread_n];  /*线程的参数结构指针*/
-	printf("thread_n: %d\nfile_size:%ldM\ntime_s:%ds\n", thread_n, file_size/1024/1024, time_s);
+	printf("thread_n: %d\nfile_size:%ldM\n", thread_n, file_size/1024/1024);
 
 	for (tid=0; tid<thread_n; tid++) {
 		t_args[tid] = (struct thread_args *)malloc(sizeof(struct thread_args));
@@ -305,11 +305,14 @@ int dfile(struct dirsname *dirsp)
 	while (1) {
 		if (update_list(dirsp) < 0){
 			fprintf(stderr, "update_list error!\n");
+			openlog("fs_write", LOG_CONS|LOG_PID, 0);
+			syslog(LOG_USER|LOG_ERR, "update_list  error!\n",tmp->name);
+			return -1;
 		}
 		tmp = dirsp->next;
 		while (tmp != dirsp) {
 			/*进入指定目录*/
-			
+
 			chdir(root_dir);
 			if (chdir(tmp->name) < 0) {
 				fprintf(stderr, "dfile Can't into %s", tmp->name);

@@ -10,7 +10,7 @@
 int main(int argc, char *argv[])
 {
 
-	if ((argc < 2) || (argc > 2 && argc < 5) || (argc > 5)) {
+	if ((argc < 2) || (argc > 2 && argc < 4) || (argc > 4)) {
 		fprintf(stderr, "Error args!\n");
 		print_usage();
 		return -1;
@@ -20,10 +20,9 @@ int main(int argc, char *argv[])
 	if (root_dir[strlen(root_dir)-1] == '/') {
 		root_dir[strlen(root_dir)-1] = '\0';	
 	}
-	if (argc == 5) {
+	if (argc == 4) {
 		file_size = atol(argv[2])*1024*1024;
 		thread_n = atoi(argv[3]);
-		time_s = atoi(argv[4]);
 	}
 
 	dirsp=(struct dirsname *)malloc(sizeof(struct dirsname));
@@ -38,8 +37,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	if (parse_args(root_dir,dirsp) < 0) {
-		openlog("fs_write", LOG_CONS|LOG_PID, 0);
-		syslog(LOG_USER|LOG_ERR, "parse_args error!\n");
+		//fprintf(stderr, "parse_args error!\n");
 		print_usage();
 		return -1;
 	}
