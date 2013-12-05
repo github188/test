@@ -1,22 +1,9 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <sys/vfs.h>
+#ifndef __PARSE_ARGS_
+#define __PARSE_ARGS_
 #include "comm.h"
-#include "list.h"
 
-
-int dir_mounted(char *);
-int dir_enough_space(char *);
-int check_fs(char *root_dir, struct dirsname *);
-int get_dirs(char *root_dir, struct dirsname *);
-void print_usage(void);
-int check_threadn(void);
-long get_fs_space(char *);
-int get_fs_stat(char *);
-struct dirsname * get_fs_dirs(struct dirsname *);
-int parse_args(char *root_dir,struct dirsname *dirsp);
+void print_help(void);
+void print_usage(void); /*打印帮助*/
+int update_list(struct dirsname *, long, int); /*更新文件系统链表*/
+int parse_args(struct dirsname *, long, int); /*解析参数*/
+#endif

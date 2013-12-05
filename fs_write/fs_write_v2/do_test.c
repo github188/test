@@ -6,7 +6,68 @@
  * Description : 
  * *****************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <sys/statfs.h>
+#include <string.h>
+#include <dirent.h>
+#include <time.h>
+#include "main.h"
+#include "parse_args.h"
+#include "comm.h"
+#include "mdigest.h"
+#include "list.h"
 #include "do_test.h"
+
+/*返回dirname目录挂载的文件系统可用块数*/
+long get_fs_space(char *path)
+{
+	struct statfs fsbuf;
+	long i;
+
+
+	if (statfs(path, &fsbuf) < 0) {
+		fprintf(stderr, "Can't get %s's statfs!\n", path);
+		return -1;
+	}
+	return fsbuf.f_bavail;	
+}
+
+/*返回dirname挂在的文件系统剩余空间百分比*/
+int get_fs_stat(char *path) 
+{	
+	char buf[300];
+	struct statfs fsbuf;
+
+	if (statfs(path, &fsbuf) < 0) {
+		fprintf(stderr, "Can't get %s's statfs!\n", path);
+		return -1;
+	}
+
+	return (int)((fsbuf.f_bavail*100)/fsbuf.f_blocks);
+
+}
+/*返回剩余空间百分比最大的dirsname指针*/
+struct dirsname *get_fs_dirs(struct dirsname *dirsp)
+{
+	char path[300];
+	struct dirsname *tmp=NULL;
+	struct dirsname *result=NULL;
+	struct statfs fsbuf;
+	long i = 0, j;
+	tmp = dirsp->next;
+	while (tmp != dirsp) {
+		sprintf(path, "%s/%s", root_dir, tmp->name);
+		if ((j = get_fs_stat(path)) > i) {
+			i = j;
+			result = tmp;
+		}	
+		tmp = tmp->next;		
+	}
+	return result;
+}
 
 int get_random(void)
 {
@@ -14,9 +75,11 @@ int get_random(void)
 
 	return rand();
 }
+
 void *_w_thread(void *arg)
-{ 
-	int buf[BLOCK_SIZE/4];
+{	
+	int block_size = ((struct thread_args *)arg)->block_size;
+	int buf[block_size/4+1];
 	int i, j, count, tnum;
 	char filename[300]; /*线程正在写的文件的 完整路径*/
 	FILE *fp;
@@ -31,23 +94,15 @@ void *_w_thread(void *arg)
 
 	t_dirsp = (struct dirsname *)((struct thread_args *)arg)->dp;
 	tnum =(int) ((struct thread_args *)arg)->thread_num;
-	count = file_size/BLOCK_SIZE;
+	count =((struct thread_args *)arg)->file_size / block_size + 1;
 	while (1) {
 		tmp = get_fs_dirs(t_dirsp);
 		if (tmp == NULL) {
 			fprintf(stderr, "Can't get_fs_dirs!\n");
 			return (void *)-1;
 		}
-
-		strcpy(dirbuf, root_dir);
-		strcat(dirbuf, "/");
-		strcat(dirbuf, tmp->name);
-
-		strcpy(filename, dirbuf);
-		strcat(filename, "/");
-		sprintf(namebuf, "tmp.%d", tnum);
-		strcat(filename, namebuf);
-
+		sprintf(dirbuf, "%s/%s", root_dir, tmp->name);
+		sprintf(filename, "%s/tmp.%d", dirbuf, tnum);
 		if (chdir(dirbuf) < 0) {
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "thread %d can't change dir to %s!\n",tnum, dirbuf);
@@ -64,11 +119,11 @@ void *_w_thread(void *arg)
 		/*count为写够FILE_SIZE所需要的次数*/
 		for(i=0; i < count; i++) {
 			begin = get_random();
-			for (j=0; j<BLOCK_SIZE/4; j++) {
+			for (j=0; j<block_size/4; j++) {
 				buf[j] = begin+j;
 			}
 			fwrite(buf, sizeof(buf), 1,  fp);
-			md5_update(&context, (char *)buf, BLOCK_SIZE);
+			md5_update(&context, (char *)buf, block_size);
 		}
 		fflush(fp);
 		fsync(fileno(fp));
@@ -88,10 +143,7 @@ void *_w_thread(void *arg)
 			fprintf(stderr, "Can't get the date!\n");
 			pthread_exit((void *)-1);
 		}
-
-		strcat(dirbuf, "/");
-		strcat(dirbuf, namebuf);
-		strcat(dirbuf, "/");
+		sprintf(dirbuf, "%s/%s", dirbuf, namebuf);
 		if (access(dirbuf, F_OK) < 0) {
 			if (mkdir(dirbuf ,FILE_MOD) < 0) {
 				/*	fprintf(stderr, "make date dir %s error!\n", namebuf);
@@ -104,8 +156,7 @@ void *_w_thread(void *arg)
 			fprintf(stderr, "Can't get the hour!\n");
 			pthread_exit((void *)-1);
 		}
-		strcat(dirbuf, namebuf);
-		strcat(dirbuf, "/");
+		sprintf(dirbuf, "%s/%s/", dirbuf, namebuf);
 		if (access(dirbuf, F_OK) < 0) {
 			if (mkdir(dirbuf, FILE_MOD) < 0) {
 				/*	fprintf(stderr, "Can't make hour dir!\n");
@@ -131,7 +182,7 @@ void *_w_thread(void *arg)
 			return (void *)-1;
 		}	
 		while (i=(fread(buf, sizeof(buf), 1, fp))) {
-			md5_update(&context, (char *)buf, BLOCK_SIZE);
+			md5_update(&context, (char *)buf, block_size);
 		}
 		fclose(fp);
 		md5_result(&context, md5);
@@ -145,28 +196,32 @@ void *_w_thread(void *arg)
 		if (strncmp(md5str ,newname, 32) != 0){
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "thread %d's md5 check error!\n",tnum);
-			fprintf(stderr, "MD5 error!\n");
+			fprintf(stderr, "thread %d's md5 check error!\n", tnum);
 			return (void *)-1;
 		}  
 	}
 }
 /*创建写线程*/
-int w_thread (struct dirsname *dirsp)
+int w_thread (struct dirsname *dirsp, long file_size, int block_size, int thread_n, int time_s)
 {
 	int tid;
 	int err;
 	struct thread_args *t_args[thread_n];  /*线程的参数结构指针*/
-	printf("thread_n: %d\nfile_size:%ldM\n", thread_n, file_size/1024/1024);
+	printf("thread_n: %d\nfile_size:%ldM\nblock_size:%d\ntime_s:%d\n",
+		       	thread_n, file_size/1024/1024, block_size, time_s);
 
 	for (tid=0; tid<thread_n; tid++) {
 		t_args[tid] = (struct thread_args *)malloc(sizeof(struct thread_args));
-		if (t_args == NULL) {
+		if (t_args[tid] == NULL) {
 			fprintf(stderr, "thread %d malloc error!\n", tid);
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "thread %d malloc error!\n", tid);
 			return -1;
 		}
+		t_args[tid]->file_size = file_size;
+		t_args[tid]->block_size = block_size;
 		t_args[tid]->thread_num  = tid;
+		t_args[tid]->time_s = time_s;
 		t_args[tid]->dp = dirsp;
 		if (pthread_create(&threads[tid], NULL, &_w_thread, (void *)t_args[tid]) != 0) {
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
@@ -203,15 +258,15 @@ int get_hour(char  *buf)
 	}
 	return 0;
 }
-int find_delete(char *dir, char *buf)
+int find_delete(char *path, char *buf)
 {
 	DIR *dirp;
 	struct dirent *dp;
 	char tmp[100]="9999999999";
 
 	//strcpy(tmp,"999999999\0");
-	if ((dirp = opendir(dir)) == NULL) {
-		fprintf(stderr, "Can't open the dir %s\n", dir);
+	if ((dirp = opendir(path)) == NULL) {
+		fprintf(stderr, "Can't open the dir %s\n", path);
 		closedir(dirp);
 		return -1;
 	}
@@ -227,7 +282,7 @@ int find_delete(char *dir, char *buf)
 	strcpy(buf, tmp);
 	return 0;
 }
-int _dfile(char *dir)
+int _dfile(char *path)
 {
 
 	int n=0;
@@ -240,7 +295,7 @@ int _dfile(char *dir)
 	time_t nowtime;
 	char cmd[200];
 	/*找到最早的date目录*/
-	if (find_delete(dir, datebuf) < 0) {
+	if (find_delete(path, datebuf) < 0) {
 		fprintf(stderr, "Can't find date file to delete!\n");
 		return -1;
 	}
@@ -256,9 +311,7 @@ int _dfile(char *dir)
 		if (dp->d_type == DT_DIR) {
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 				n++;
-				strcpy(hourbuf, datebuf);
-				strcat(hourbuf, "/");
-				strcat(hourbuf, dp->d_name);
+				sprintf(hourbuf, "%s/%s", datebuf, dp->d_name);
 				/*得到目录的创建时间*/
 				if (stat(hourbuf, &statbuf) < 0) {
 					fprintf(stderr, "Can't stat the dir %s\n", hourbuf);
@@ -279,6 +332,7 @@ int _dfile(char *dir)
 		sprintf(cmd, "rm -rf %s", thefile);
 		if (system(cmd) < 0) {
 			fprintf(stderr, "Can't delete the file!/n", thefile);
+			return -1;
 		} else {
 			n--;
 		}
@@ -289,46 +343,55 @@ int _dfile(char *dir)
 		sprintf(cmd, "rm -rf %s", datebuf);
 		if (system(cmd) < 0) {
 			fprintf(stderr, "_dfile can't delete %s\n", datebuf);
+			return -1;
 		}
 	}
 	sync();
 	return 0;
 
 }
-/*如果文件系统剩余空间不足则删除文件*/
-int dfile(struct dirsname *dirsp)
+void release_percent(struct dirsname *dirsp)
 {
+	struct dirsname *tmp;
+	char path[300];
+	tmp = dirsp->next;
+	while ( tmp != dirsp ) {
+		sprintf(path, "%s/%s", root_dir, tmp->name);
+		while( get_fs_stat(path) < END_RELEASE ) {
+			if (_dfile(path) < 0) { 
+				openlog("fs_write", LOG_CONS|LOG_PID, 0);
+				syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
+				fprintf(stderr, "dfile %s error!\n", path);
+			}
+		}
+	}
+}
+/*如果文件系统剩余空间不足则删除文件*/
+int dfile(struct dirsname *dirsp, long file_size, int thread_n)
+{
+	char path[300];
 	char buf[10];
-	struct statfs fsbuf;
 	struct dirsname *tmp;
 
+
 	while (1) {
-		if (update_list(dirsp) < 0){
+
+		if (update_list( dirsp, file_size, thread_n) < 0){
 			fprintf(stderr, "update_list error!\n");
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "update_list  error!\n",tmp->name);
-			return -1;
 		}
 		tmp = dirsp->next;
 		while (tmp != dirsp) {
+			sprintf(path, "%s/%s", root_dir, tmp->name);
 			/*进入指定目录*/
-
-			chdir(root_dir);
-			if (chdir(tmp->name) < 0) {
+			if (chdir(path) < 0) {
 				fprintf(stderr, "dfile Can't into %s", tmp->name);
 				return -1;
 			}
 			/*可用空间少于20%*/
-			if (get_fs_stat(tmp->name) < 20) {
-				/*直到可用空间大于40%*/
-				while(get_fs_stat(tmp->name) <= 40) {
-					if (_dfile(tmp->name) < 0) { 
-						openlog("fs_write", LOG_CONS|LOG_PID, 0);
-						syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",tmp->name);
-						fprintf(stderr, "Release space error!\n");
-						return -1;
-					}
-				}
+			if (get_fs_stat(path) < START_RELEASE) {
+				release_percent(dirsp);
 			}
 			tmp = tmp->next;
 		}

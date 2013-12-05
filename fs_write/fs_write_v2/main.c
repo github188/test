@@ -5,26 +5,75 @@
  * Filename : main.c
  * Description : 
  * *****************************************************************************/
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <getopt.h>
+#include "comm.h"
+#include "parse_args.h"
+#include "do_test.h"
 #include "main.h"
+
+char *l_opt_arg;
+char *const short_options = "s:b:n:t:p:h";
+struct option long_options[] = {
+	{"file-size", 1, NULL, 's'},
+	{"block-size", 1, NULL, 'b'},
+	{"threadn", 1, NULL, 'n'},
+	{"time", 1, NULL, 't'},
+	{"choose-policy", 1, NULL, 'p'},
+	{"help", 0, NULL, 'h'},
+};
+
+long file_size = 268435456;
+int block_size = 1024;
+int thread_n = 4;
+int time_s=0;
+char root_dir[300];
+
 
 int main(int argc, char *argv[])
 {
 
-	if ((argc < 2) || (argc > 2 && argc < 4) || (argc > 4)) {
-		fprintf(stderr, "Error args!\n");
-		print_usage();
+	struct dirsname *dirsp=NULL;
+	int c;
+
+	if ((argc < 2)) {
+		fprintf(stderr, "No root_dir!\n");
+		print_help();
 		return -1;
 	}
-
 	strcpy(root_dir, argv[1]);
 	if (root_dir[strlen(root_dir)-1] == '/') {
 		root_dir[strlen(root_dir)-1] = '\0';	
 	}
-	if (argc == 4) {
-		file_size = atol(argv[2])*1024*1024;
-		thread_n = atoi(argv[3]);
+	while ((c = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
+		switch(c) {
+			case 's':
+				file_size = atol(optarg);
+				break;
+			case 'b':
+				block_size = atoi(optarg);
+				break;
+			case 'n':
+				thread_n = atoi(optarg);
+				break;
+			case 't':
+				time_s = atoi(optarg);
+				break;
+			case 'p':
+				break;
+			case 'h':
+				print_usage();
+				break;
+			default :
+				break;
+		}
+		
 	}
-
+	/*printf("file_size:%ld\nblock_size:%d\nthread_n:%d\ntime_s:%d\n", file_size,
+			block_size, thread_n, time_s); */
 	dirsp=(struct dirsname *)malloc(sizeof(struct dirsname));
 	if (dirsp == NULL) {
 		fprintf(stderr, "malloc dirsp error!\n");
@@ -33,18 +82,20 @@ int main(int argc, char *argv[])
 	dirsp->name[0] = '\0';
 	dirsp->next = dirsp;
 	if (chdir(root_dir) < 0) {
-		fprintf(stderr, "Can't into the root_dir!\n");
+		fprintf(stderr, "root_dir is invalid!\n");
+		print_help();
 		return -1;
 	}
-	if (parse_args(root_dir,dirsp) < 0) {
+
+	if (parse_args(dirsp, file_size, thread_n) < 0) {
 		//fprintf(stderr, "parse_args error!\n");
-		print_usage();
+		print_help();
 		return -1;
 	}
-	if (w_thread(dirsp) < 0) {
+	if (w_thread(dirsp, file_size, block_size, thread_n, time_s) < 0) {
 		return -1;
 	}
-	if (dfile(dirsp) < 0) {
+	if (dfile(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
 

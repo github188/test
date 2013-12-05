@@ -1,16 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <unistd.h>
-#include <string.h>
+#ifndef __MAIN_H
+#define __MAIN_H
 #include "comm.h"
-#include "parse_args.h"
-#include "do_test.h"
-
-
-struct dirsname *dirsp=NULL;
-long int file_size = 268435456;
-int thread_n = 4;
-/* int time_s = 120; */
-
-static int  n, now=0;
+extern char root_dir[300];
+#endif

@@ -1,5 +1,36 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/vfs.h>
+#include "comm.h"
+#include "list.h"
 #include "parse_args.h"
-/*检查目录是否挂载文件系统*/
+
+void print_help(void) 
+{
+	printf("Try fs_write --help or -h for more information.\n");
+}
+void print_usage(void)
+{
+	printf("fs_write, version 0.2\n");
+	printf( "Usage: fs_write root_dir [[-s file_size] [-b block_size] [-n thread_n]\n");
+	printf( "\t\t[-t time] [-p choose-policy]]\n" );
+	printf( "\troot_dir        :\tthe dir include mountpoints.\n\n" );
+	printf( "\t-s --file-size  :file_size \tthe filesize the unit is M default is 256M.\n" );
+	printf( "\t-b --block-size :block_size\tthe blocksize of the file to write,default is 1024.\n");
+	printf(	"\t-n --threadn    :thread_n    \tthe number of write thread, should be lower 32 default is 4.\n" );
+	printf(	"\t-t --time       :time_s      \tevery seconds change the mountpoints to write. \n");
+	printf( "\t\t\t\t\tif time_s=0 the thread will choose fs to write after write one file.\n" );
+	printf( "\t-p --choose-policy:policy    \tthe policy used by write thread to choose file system.\n");
+	printf( "\t\t\t\t\tit can be one of {weighting|free-size|free-percent}.\n");
+	printf( "\n\n");
+}
+
+/*检查目录是否挂载文件系统 返回0为挂载了*/
 int dir_mounted(char *dirname)
 {
 	FILE *fp;
@@ -10,9 +41,7 @@ int dir_mounted(char *dirname)
 		fprintf(stderr, "Can't open /proc/mounts!\n");
 		return -1;
 	}
-	strcpy(path, root_dir);
-	strcat(path, "/");
-	strcat(path, dirname);
+	sprintf(path, "%s/%s", root_dir, dirname);
 	while (fgets(buf, 499, fp) > 0) {
 		if (strstr(buf, path) != NULL) {
 			fclose(fp);
@@ -20,62 +49,65 @@ int dir_mounted(char *dirname)
 		}
 	}
 	fclose(fp);
-	return 1;
+	return -1;
 
 }
-int dir_enough_space(char *dirname)
+/*检查dirname目录可用空间是否足够*/
+int dir_enough_space(char *dirname, long file_size, int thread_n)
 {
 	struct statfs statbuf;
 	char path[300];
 
-	strcpy(path, root_dir);
-	strcat(path, "/");
-	strcat(path, dirname);
+	sprintf(path, "%s/%s", root_dir, dirname);
 
 	/*判断文件系统是否有足够的空间*/
-		if (statfs(path, &statbuf) < 0) {
-			fprintf(stderr, "%s can't statfs!\n", path);
-			return -1;
-		}
-		if (statbuf.f_blocks * statbuf.f_bsize < BLOCK_SIZE * thread_n) {
-			if (list_del(dirsp, dirname) < 0) {
-				return -1;
-			}
-			/*fprintf(stderr, "%s have no enough space to run all threads\n", tmp->name);
-			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
-			  syslog(LOG_USER|LOG_ERR, "%s have no enough space to run all threads\n", tmp->name);*/
-		}
+	if (statfs(path, &statbuf) < 0) {
+		fprintf(stderr, "%s can't statfs!\n", path);
+		return 1;
+	}
+	if (statbuf.f_bavail * statbuf.f_bsize < file_size * thread_n) {
+		return -1;
+	}
 	return 0;
 
 }
-int check_fs(char *root_dir, struct dirsname *dirsp)
+/*删除链表中name值为dirname的*/
+int del_list_node(struct dirsname *dirsp, char *dirname) {
+	if (list_del(dirsp, dirname) < 0){
+		fprintf(stderr, "delete %s error!\n", dirname);
+		return -1;
+	}
+	return 0;
+}
+int check_fs( struct dirsname *dirsp, long file_size, int thread_n)
 {
 	struct dirsname *tmp;
 	int ret;
 
 	tmp = dirsp->next;
 	while (tmp != dirsp){
-
-
-		if (dir_mounted(tmp->name) > 0) {
-			if (list_del(dirsp, tmp->name) < 0){
-				return -1;
-			}
-
+		if (dir_mounted(tmp->name) < 0) {
 			/*fprintf(stderr, "%s is not mounted a file system!\n", tmp->name);
 			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			  syslog(LOG_USER|LOG_ERR, "%s is not mounted a file system!\n", tmp->name); */
-		}
-		if (dir_enough_space(tmp->name) < 0) {
+			if (del_list_node(dirsp, tmp->name) < 0){
 				return -1;
+			}
 		}
+		if (dir_enough_space(tmp->name, file_size, thread_n) < 0) {
+			/*fprintf(stderr, "%s have no enough space to run all threads\n", tmp->name);
+			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
+			  syslog(LOG_USER|LOG_ERR, "%s have no enough space to run all threads\n", tmp->name);*/
+			if (del_list_node(dirsp, tmp->name) < 0)
+				return -1;
+		} 
 		tmp = tmp->next;
 	}
 	return 0;
 
 }
-/*将root_dir的子目录名字放到链表中*/
-int get_dirs(char *root_dir, struct dirsname *dirsp)
+/*将root_dir的子目录放到链表中*/
+int get_dirs(struct dirsname *dirsp)
 {
 	int i=0;
 	DIR *dirp;
@@ -88,20 +120,17 @@ int get_dirs(char *root_dir, struct dirsname *dirsp)
 		return -1;
 	}
 	while ((dp = readdir(dirp)) != NULL ) {
-
 		if (dp->d_type == DT_DIR) {
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 				/*过滤掉.和..*/
 				/*将链表中没有的目录加到链表中*/
-
-				if(dir_mounted(dp->d_name) == 0) {
-					if (list_add(dirsp, dp->d_name) < 0) {
+							
+				if (list_add(dirsp, dp->d_name) < 0) {
 						return -1;
 					}	
 					i++;
 				}
 			}
-		}
 	}
 
 	closedir(dirp);
@@ -111,73 +140,14 @@ int get_dirs(char *root_dir, struct dirsname *dirsp)
 	}
 	return 0;
 }
-void print_usage(void)
-{
-	printf( "Usage: fs_write filename  filesize  threadn  times\n" );
-	printf( "\tfilename: the dir include mountpoints\n" );
-	printf( "\tfilesize: the filesize the unit is M\n" );
-	printf(	"\tthreadn : the number of write thread, should be lower 32\n" );
-	/*printf(	"\ttimes   : every seconds change the mountpoints to write\n" ); */
-	printf( "\n");
-}
-int check_threadn(void) {
+
+int check_threadn(int thread_n) {
 	if (thread_n > THREAD_MAX) {
 		fprintf(stderr, "thread's number lager than limits!\n");
 		return -1;
 	}
 }
-/*返回dirname目录挂载的文件系统剩余空间*/
-long get_fs_space(char *dirname)
-{
-	char buf[300];
-	struct statfs fsbuf;
-	long i;
-
-	strcpy(buf, root_dir);
-	strcat(buf, "/");
-	strcat(buf, dirname);
-
-	if (statfs(buf, &fsbuf) < 0) {
-		fprintf(stderr, "Can't get %s's statfs!\n", buf);
-		return -1;
-	}
-	return fsbuf.f_bfree;	
-}
-
-/*返回dirname挂在的文件系统剩余空间百分比*/
-int get_fs_stat(char *dirname) 
-{	
-	char buf[300];
-	struct statfs fsbuf;
-	strcpy(buf, root_dir);
-	strcat(buf, "/");
-	strcat(buf, dirname);
-
-	if (statfs(buf, &fsbuf) < 0) {
-		fprintf(stderr, "Can't get %s's statfs!\n", buf);
-		return -1;
-	}
-
-	return (int)((fsbuf.f_bfree*100)/fsbuf.f_blocks);
-
-}
-
-struct dirsname *get_fs_dirs(struct dirsname *dirsp)
-{
-	struct dirsname *tmp=NULL;
-	struct dirsname *result=NULL;
-	struct statfs fsbuf;
-	long i = 0, j;
-	tmp = dirsp->next;
-	while (tmp != dirsp) {
-		if ((j = get_fs_space(tmp->name)) > i) {
-			i = j;
-			result = tmp;
-		}	
-		tmp = tmp->next;		
-	}
-	return result;
-}
+/*打印链表*/
 void print_dirsp(struct dirsname *dirsp)
 {
 	struct dirsname *tmp;
@@ -188,21 +158,7 @@ void print_dirsp(struct dirsname *dirsp)
 	}
 	printf("\n");
 }
-int update_list(struct dirsname *dirsp)
-{
-
-	if (get_dirs(root_dir, dirsp) < 0){
-		return -1;
-	}
-	if (check_fs(root_dir, dirsp) < 0) {
-		return -1;
-	}
-	if (check_dirsp(dirsp) < 0) {
-		return -1;
-	}
-	print_dirsp(dirsp);
-	return 0;
-}
+/*检查链表是否为空*/
 int check_dirsp(struct dirsname *dirsp)
 {
 	if (dirsp->next == dirsp){
@@ -214,13 +170,31 @@ int check_dirsp(struct dirsname *dirsp)
 	else
 		return 0;
 }
-/*参数解析*/
-int parse_args(char *root_dir, struct dirsname *dirsp)
+int update_list( struct dirsname *dirsp, long file_size, int thread_n)
 {
-	if (update_list( dirsp) < 0) {
+
+
+	if (get_dirs(dirsp) < 0){
 		return -1;
 	}
-	if (check_threadn() < 0) {
+
+	if (check_fs(dirsp, file_size, thread_n) < 0) {
+		return -1;
+	}
+	if (check_dirsp(dirsp) < 0) {
+		return -1;
+	}
+	print_dirsp(dirsp);
+	return 0;
+}
+
+/*参数解析*/
+int parse_args(struct dirsname *dirsp, long file_size, int thread_n)
+{
+	if (update_list( dirsp, file_size, thread_n) < 0) {
+		return -1;
+	}
+	if (check_threadn(thread_n) < 0) {
 		return -1;
 	}
 	return 0;
