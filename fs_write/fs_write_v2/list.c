@@ -21,6 +21,7 @@ struct dirsname *list_end(struct dirsname *dp)
 	}
 	if (tmp->next == dp)
 		return tmp;
+	return NULL;
 }
 int list_have(struct dirsname *dp, char *dirname)
 {
@@ -33,7 +34,6 @@ int list_have(struct dirsname *dp, char *dirname)
 			tmp = tmp->next;
 		}
 	}
-	if (tmp == dp)
 		return -1;
 }
 int list_add(struct dirsname *dp, char *dirname)
@@ -70,4 +70,18 @@ int list_del(struct dirsname *dp, char *dirname)
 	}
 	return 0;
 }
+struct dirsname *list_next(struct dirsname *dp, struct dirsname *now)
+{
+	struct dirsname *tmp = dp->next;	
 
+	while (tmp != dp) {
+		if (tmp == now)  {
+			if(tmp->next == dp)
+				return dp->next;
+			else 
+				return tmp->next;
+		}
+		tmp = tmp->next;
+	}
+	return NULL;
+}

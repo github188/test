@@ -10,5 +10,5 @@ struct dirsname *list_end(struct dirsname *);
 int list_have(struct dirsname*, char *);
 int list_add(struct dirsname *, char *);
 int list_del(struct dirsname *, char *);
-
+struct dirsname *list_next(struct dirsname *, struct dirsname *);
 #endif

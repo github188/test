@@ -100,7 +100,6 @@ int get_dirs(struct dirsname *dirsp)
 	int i=0;
 	DIR *dirp;
 	struct dirent *dp;	
-	struct dirsname *tmp;
 	int ret;
 
 	if ((dirp = opendir(root_dir)) < 0) {
@@ -132,6 +131,7 @@ int check_threadn(int thread_n) {
 		fprintf(stderr, "thread's number lager than limits!\n");
 		return -1;
 	}
+	return 0;
 }
 /*打印链表*/
 void print_dirsp(struct dirsname *dirsp)

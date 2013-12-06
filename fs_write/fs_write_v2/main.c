@@ -10,11 +10,15 @@
 #include <unistd.h>
 #include <string.h>
 #include <getopt.h>
+#include <signal.h>
 #include "comm.h"
 #include "parse_args.h"
 #include "moniter.h"
 #include "threads.h"
 #include "main.h"
+#include "init_time.h"
+#include "list.h"
+
 
 char *l_opt_arg;
 char *const short_options = "s:b:n:t:p:h";
@@ -33,12 +37,20 @@ int block_size = 1024;
 int thread_n = 4;
 int time_s=0;
 char root_dir[300];
+struct dirsname *now = NULL;
+struct dirsname *dirsp=NULL;
 
+void sig_alarm(int signo)
+{
+	if (signo == SIGALRM) {
+		now = list_next(dirsp, now);
+	}
+	printf("now dir is %s\n", now->name);
+}
 
 int main(int argc, char *argv[])
 {
 
-	struct dirsname *dirsp=NULL;
 	int c;
 
 	if ((argc < 2)) {
@@ -91,11 +103,17 @@ int main(int argc, char *argv[])
 		print_help();
 		return -1;
 	}
-
 	if (parse_args(dirsp, file_size, thread_n) < 0) {
 		//fprintf(stderr, "parse_args error!\n");
 		print_help();
 		return -1;
+	}
+	
+	if (time_s != 0) {
+		if (init_time(time_s) < 0)
+			return -1;
+		now = dirsp->next;
+		signal(SIGALRM, sig_alarm);
 	}
 	if (start_w_thread(dirsp, file_size, block_size, thread_n, time_s) < 0) {
 		return -1;
@@ -103,5 +121,5 @@ int main(int argc, char *argv[])
 	if (moniter(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
-
+	return 0;
 }

@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/statfs.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <dirent.h>
 #include <time.h>
@@ -18,13 +19,12 @@
 #include "comm.h"
 #include "list.h"
 #include "moniter.h"
+#include "threads.h"
 
 /*返回dirname目录挂载的文件系统可用空间*/
 long get_fs_space(char *path)
 {
 	struct statfs fsbuf;
-	long i;
-
 
 	if (statfs(path, &fsbuf) < 0) {
 		fprintf(stderr, "Can't get %s's statfs!\n", path);
@@ -36,7 +36,6 @@ long get_fs_space(char *path)
 /*返回dirname挂在的文件系统剩余空间百分比*/
 float get_fs_stat(char *path) 
 {	
-	char buf[300];
 	struct statfs fsbuf;
 
 	if (statfs(path, &fsbuf) < 0) {
@@ -44,7 +43,7 @@ float get_fs_stat(char *path)
 		return -1;
 	}
 
-	return (float)((fsbuf.f_bavail*100)/fsbuf.f_blocks);
+	return ((float)fsbuf.f_bavail/fsbuf.f_blocks);
 
 }
 /*返回剩余空间百分比最大的dirsname指针*/
@@ -53,8 +52,7 @@ struct dirsname *get_fs_dirs(struct dirsname *dirsp)
 	char path[300];
 	struct dirsname *tmp=NULL;
 	struct dirsname *result=NULL;
-	struct statfs fsbuf;
-	float i = 0, j;
+	float i = 0.0, j;
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
@@ -75,16 +73,18 @@ int find_delete(char *path, char *buf)
 	char tmp[100]="9999999999";
 
 	//strcpy(tmp,"999999999\0");
-	if ((dirp = opendir(path)) == NULL) {
+	if (!(dirp = opendir(path))) {
 		fprintf(stderr, "Can't open the dir %s\n", path);
 		closedir(dirp);
 		return -1;
 	}
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_type == DT_DIR){
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
-				if (strcmp(dp->d_name, tmp) < 0)
+				if (strcmp(dp->d_name, tmp) != 0) {
 					strcpy(tmp, dp->d_name);
+				}
+				return -1;
 			}
 		}
 	}
@@ -114,11 +114,11 @@ int _dfile(char *path)
 	//	printf("the date file  is %s\n", datebuf);
 	/*找到最早的hour目录*/
 	time(&nowtime);
-	if ((dirp = opendir(datebuf)) == NULL) {
+	if ((dirp = opendir(datebuf)) < 0) {
 		fprintf(stderr, "Can't open dir %s\n", datebuf);
 		return -1;
 	}
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp)) != NULL) {
 		/*找到date目录下的hour目录*/
 		if (dp->d_type == DT_DIR) {
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
@@ -143,7 +143,7 @@ int _dfile(char *path)
 	if (n > 0) {                                                                                                             
 		sprintf(cmd, "rm -rf %s", thefile);
 		if (system(cmd) < 0) {
-			fprintf(stderr, "Can't delete the file!/n", thefile);
+			fprintf(stderr, "Can't delete the file %s!/n", thefile);
 			return -1;
 		} else {
 			n--;
@@ -195,7 +195,7 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 		if (update_list( dirsp, file_size, thread_n) < 0){
 			fprintf(stderr, "update_list error!\n");
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
-			syslog(LOG_USER|LOG_ERR, "update_list  error!\n",tmp->name);
+			syslog(LOG_USER|LOG_ERR, "update_list %s error!\n",tmp->name);
 		}
 		tmp = dirsp->next;
 		while (tmp != dirsp) {
@@ -205,13 +205,13 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 				n++;
 			}
 			sum++;
-			printf("%s\t", tmp->name);
 			tmp = tmp->next;
 		}
-		printf("\n");
-		if ( flag && (float)n/(float)sum >= 0.5){
+		if ( flag && ((float)n/sum >= 0.5)){
 			flag = 0; /*确保只有一个删除线程*/
+			printf("starting delete thread!\n");
 			start_d_thread(dirsp, &flag);
+			printf("deltete thread end!\n");
 		}  else {
 			sleep(10);
 		}

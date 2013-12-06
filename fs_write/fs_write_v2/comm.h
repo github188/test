@@ -5,8 +5,8 @@
 
 
 #define THREAD_MAX 32  /*最多线程个数*/
-#define START_RELEASE 20.0 /*开始删除的可用空间比*/
-#define END_RELEASE 40.0 /*删除到60%*/
+#define START_RELEASE 0.2 /*开始删除的可用空间比*/
+#define END_RELEASE 0.4 /*删除到60%*/
 
 
 struct dirsname{
@@ -16,4 +16,5 @@ struct dirsname{
 };
 
 extern char root_dir[300];
+extern  struct dirsname * now;
 #endif

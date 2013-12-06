@@ -6,8 +6,11 @@
  * Description : 创建写线程
  * *****************************************************************************/
 #include <stdio.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/statfs.h>
 #include <string.h>
 #include <dirent.h>
@@ -71,7 +74,6 @@ int get_newpath(char *newpath, int tnum)
 			return -1;
 		}
 	}
-
 	return 0;
 }
 int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
@@ -126,11 +128,12 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 			md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],
 			md5[14],md5[15]);
 
-
-	sprintf(newpath, "%s/%s/%s", root_dir, tmp->name, namebuf);
+	
+	
+	sprintf(newpath, "%s/%s", root_dir, tmp->name);
 	do{ ret = get_newpath(newpath, tnum);}while(ret < 0);
 	strcat(newpath, newname);
-
+	
 	/*rename成新文件*/
 	if (rename(tmppath, newpath) < 0) {
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
@@ -147,7 +150,7 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 		fprintf(stderr, "Can't open %s!\n", newpath);
 		return -1;
 	}	
-	while (i=(fread(buf, sizeof(buf), 1, fp))) {
+	while ((fread(buf, sizeof(buf),(size_t)1, fp))) {
 		md5_update(&context, (char *)buf, block_size);
 	}
 	fclose(fp);
@@ -186,7 +189,7 @@ void *w_thread(void *arg)
 		if (time_s == 0){
 			tmp = get_fs_dirs(t_dirsp);
 		} else {
-
+			tmp = now;
 		}
 
 		if ( write_file( tnum,block_size, count, tmp) < 0){
@@ -194,7 +197,7 @@ void *w_thread(void *arg)
 			syslog(LOG_USER|LOG_ERR, "thread %d's error and exitting!\n",tnum);
 			fprintf(stderr, "thread %d's error and exitting!\n", tnum);
 			pthread_exit((void *)-1);
-		}	
+		}
 	}
 }
 void *d_thread(void *arg)
@@ -211,7 +214,6 @@ void *d_thread(void *arg)
 int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int thread_n, int time_s)
 {
 	int tid;
-	int err;
 	pthread_t id;
 	struct thread_args *t_args[thread_n];  /*线程的参数结构指针*/
 	printf("thread_n: %d\nfile_size:%ldM\nblock_size:%d\ntime_s:%d\n",
