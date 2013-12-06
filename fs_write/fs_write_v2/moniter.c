@@ -188,6 +188,7 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 	char path[300];
 	struct dirsname *tmp;
 	int n, sum;
+	int flag=1;
 
 	while (1) {
 		sum = n = 0;	
@@ -208,11 +209,10 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 			tmp = tmp->next;
 		}
 		printf("\n");
-		if ((float)n/(float)sum >= 0.5){
-			printf("delete\n");
-			release_percent(dirsp);
+		if ( flag && (float)n/(float)sum >= 0.5){
+			flag = 0; /*确保只有一个删除线程*/
+			start_d_thread(dirsp, &flag);
 		}  else {
-			printf("sleep\n");
 			sleep(10);
 		}
 	}

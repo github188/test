@@ -13,7 +13,7 @@
 #include "comm.h"
 #include "parse_args.h"
 #include "moniter.h"
-#include "w_thread.h"
+#include "threads.h"
 #include "main.h"
 
 char *l_opt_arg;
