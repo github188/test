@@ -1,4 +1,4 @@
-OBJECTS =  main.o do_test.o parse_args.o list.o md5.o
+OBJECTS =  main.o moniter.o parse_args.o list.o w_thread.o md5.o
 LIBES = -lpthread
 CC = gcc
 ccflags = -Wall

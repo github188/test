@@ -57,14 +57,11 @@ int dir_enough_space(char *dirname, long file_size, int thread_n)
 {
 	struct statfs statbuf;
 	char path[300];
-
+	int ret;
 	sprintf(path, "%s/%s", root_dir, dirname);
 
 	/*判断文件系统是否有足够的空间*/
-	if (statfs(path, &statbuf) < 0) {
-		fprintf(stderr, "%s can't statfs!\n", path);
-		return 1;
-	}
+	do  {ret = statfs(path, &statbuf);} while(ret < 0);
 	if (statbuf.f_bavail * statbuf.f_bsize < file_size * thread_n) {
 		return -1;
 	}
@@ -74,7 +71,7 @@ int dir_enough_space(char *dirname, long file_size, int thread_n)
 /*删除链表中name值为dirname的*/
 int del_list_node(struct dirsname *dirsp, char *dirname) {
 	if (list_del(dirsp, dirname) < 0){
-		fprintf(stderr, "delete %s error!\n", dirname);
+		fprintf(stderr, "delete %s from list error!\n", dirname);
 		return -1;
 	}
 	return 0;
@@ -87,19 +84,10 @@ int check_fs( struct dirsname *dirsp, long file_size, int thread_n)
 	tmp = dirsp->next;
 	while (tmp != dirsp){
 		if (dir_mounted(tmp->name) < 0) {
-			/*fprintf(stderr, "%s is not mounted a file system!\n", tmp->name);
-			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
-			  syslog(LOG_USER|LOG_ERR, "%s is not mounted a file system!\n", tmp->name); */
-			if (del_list_node(dirsp, tmp->name) < 0){
-				return -1;
-			}
+			do {ret =  del_list_node(dirsp, tmp->name); } while (ret < 0);
 		}
 		if (dir_enough_space(tmp->name, file_size, thread_n) < 0) {
-			/*fprintf(stderr, "%s have no enough space to run all threads\n", tmp->name);
-			  openlog("fs_write", LOG_CONS|LOG_PID, 0);
-			  syslog(LOG_USER|LOG_ERR, "%s have no enough space to run all threads\n", tmp->name);*/
-			if (del_list_node(dirsp, tmp->name) < 0)
-				return -1;
+			do {ret =  del_list_node(dirsp, tmp->name); } while (ret < 0);
 		} 
 		tmp = tmp->next;
 	}
@@ -113,7 +101,7 @@ int get_dirs(struct dirsname *dirsp)
 	DIR *dirp;
 	struct dirent *dp;	
 	struct dirsname *tmp;
-
+	int ret;
 
 	if ((dirp = opendir(root_dir)) < 0) {
 		fprintf(stderr, "Can't open the root_dir!\n");
@@ -124,13 +112,11 @@ int get_dirs(struct dirsname *dirsp)
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 				/*过滤掉.和..*/
 				/*将链表中没有的目录加到链表中*/
-							
-				if (list_add(dirsp, dp->d_name) < 0) {
-						return -1;
-					}	
-					i++;
-				}
+
+				do { ret = list_add(dirsp, dp->d_name); } while (ret < 0);
+				i++;
 			}
+		}
 	}
 
 	closedir(dirp);
@@ -161,8 +147,8 @@ void print_dirsp(struct dirsname *dirsp)
 /*检查链表是否为空*/
 int check_dirsp(struct dirsname *dirsp)
 {
-	if (dirsp->next == dirsp){
-		fprintf(stderr, "there is no dirs can to test!\n");
+	if (list_empty(dirsp) == 0){
+		fprintf(stderr, "have no dirs can to test!\n");
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
 		syslog(LOG_USER|LOG_ERR, "check_dirsp error! list is empty\n");
 		return -1;
@@ -181,10 +167,6 @@ int update_list( struct dirsname *dirsp, long file_size, int thread_n)
 	if (check_fs(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
-	if (check_dirsp(dirsp) < 0) {
-		return -1;
-	}
-	print_dirsp(dirsp);
 	return 0;
 }
 
@@ -194,8 +176,11 @@ int parse_args(struct dirsname *dirsp, long file_size, int thread_n)
 	if (update_list( dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
-	if (check_threadn(thread_n) < 0) {
+	if (check_dirsp(dirsp) < 0) {
 		return -1;
 	}
+	/*if (check_threadn(thread_n) < 0) {
+	  return -1;
+	  }*/
 	return 0;
 }

@@ -5,6 +5,7 @@
 #include <string.h>
 #include "comm.h"
 
+int list_empty(struct dirsname *);
 struct dirsname *list_end(struct dirsname *);
 int list_have(struct dirsname*, char *);
 int list_add(struct dirsname *, char *);

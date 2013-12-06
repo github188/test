@@ -12,7 +12,8 @@
 #include <getopt.h>
 #include "comm.h"
 #include "parse_args.h"
-#include "do_test.h"
+#include "moniter.h"
+#include "w_thread.h"
 #include "main.h"
 
 char *l_opt_arg;
@@ -24,6 +25,7 @@ struct option long_options[] = {
 	{"time", 1, NULL, 't'},
 	{"choose-policy", 1, NULL, 'p'},
 	{"help", 0, NULL, 'h'},
+	{0,0,0,0}
 };
 
 long file_size = 268435456;
@@ -51,7 +53,7 @@ int main(int argc, char *argv[])
 	while ((c = getopt_long(argc, argv, short_options, long_options, NULL)) != -1) {
 		switch(c) {
 			case 's':
-				file_size = atol(optarg);
+				file_size = atol(optarg)*1024*1024;
 				break;
 			case 'b':
 				block_size = atoi(optarg);
@@ -66,14 +68,17 @@ int main(int argc, char *argv[])
 				break;
 			case 'h':
 				print_usage();
+				return 0;
 				break;
 			default :
+				print_help();
+				return -1;
 				break;
 		}
-		
+
 	}
 	/*printf("file_size:%ld\nblock_size:%d\nthread_n:%d\ntime_s:%d\n", file_size,
-			block_size, thread_n, time_s); */
+	  block_size, thread_n, time_s); */
 	dirsp=(struct dirsname *)malloc(sizeof(struct dirsname));
 	if (dirsp == NULL) {
 		fprintf(stderr, "malloc dirsp error!\n");
@@ -92,10 +97,10 @@ int main(int argc, char *argv[])
 		print_help();
 		return -1;
 	}
-	if (w_thread(dirsp, file_size, block_size, thread_n, time_s) < 0) {
+	if (start_w_thread(dirsp, file_size, block_size, thread_n, time_s) < 0) {
 		return -1;
 	}
-	if (dfile(dirsp, file_size, thread_n) < 0) {
+	if (moniter(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
 

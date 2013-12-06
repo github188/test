@@ -6,7 +6,13 @@
  * Description : 
  * *****************************************************************************/
 #include "list.h"
-
+int list_empty(struct dirsname *dp)
+{
+	if (dp->next == dp)
+		return 0;
+	else 
+		return -1;
+}
 struct dirsname *list_end(struct dirsname *dp)
 {
 	struct dirsname *tmp = dp;
@@ -34,7 +40,7 @@ int list_add(struct dirsname *dp, char *dirname)
 {
 	struct dirsname *node=NULL;
 	struct dirsname *tmp = dp;
-	
+
 	if (list_have(dp, dirname) == 0)
 		return 0;
 
