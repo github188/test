@@ -47,7 +47,7 @@ float get_fs_stat(char *path)
 
 }
 /*返回剩余空间百分比最大的dirsname指针*/
-struct dirsname *get_fs_dirs(struct dirsname *dirsp)
+struct dirsname *get_fs_dirs_by_percent(struct dirsname *dirsp)
 {
 	char path[300];
 	struct dirsname *tmp=NULL;
@@ -64,8 +64,43 @@ struct dirsname *get_fs_dirs(struct dirsname *dirsp)
 	}
 	return result;
 }
+/*返回剩余空间最大的dirsname指针*/
+struct dirsname *get_fs_dirs_by_size(struct dirsname *dirsp)
+{
+	char path[300];
+	struct dirsname *tmp=NULL;
+	struct dirsname *result=NULL;
+	float i = 0.0, j;
+	tmp = dirsp->next;
+	while (tmp != dirsp) {
+		sprintf(path, "%s/%s", root_dir, tmp->name);
+		if ((j = get_fs_space(path)) > i) {
+			i = j;
+			result = tmp;
+		}	
+		tmp = tmp->next;		
+	}
+	return result;
+}
+/*默认的写策略，如果文件系统的可用空间大于80%且足够多线程同时写则返回，否则返回下一个*/
+struct dirsname *get_fs_dirs_default(struct dirsname *dirsp,struct dirsname *tmp_bef, int thread_n, long file_size)
+{
+	char path[300];
+	struct dirsname *tmp;
+	struct dirsname *result;
 
-
+	tmp = result = list_next(dirsp, tmp_bef);
+	do{
+		sprintf(path, "%s/%s", root_dir, result->name);
+		//printf("result->name:%s\t get_fs_space:%ld\t file_size*n:%ld\n",tmp->name, get_fs_space(path), thread_n*file_size);
+		if ((get_fs_stat(path)) > START_RELEASE && get_fs_space(path) >  thread_n*file_size ) {
+			return result;
+		}
+		result = result->next;
+	}while(result !=  tmp);
+	fprintf(stderr,"no file system have enough space!\n");	
+	return NULL;
+}
 int find_delete(char *path, char *buf)
 {
 	DIR *dirp;
@@ -78,13 +113,12 @@ int find_delete(char *path, char *buf)
 		closedir(dirp);
 		return -1;
 	}
-	while ((dp = readdir(dirp)) != NULL) {
+	while (dp = readdir(dirp)) {
 		if (dp->d_type == DT_DIR){
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
-				if (strcmp(dp->d_name, tmp) != 0) {
+				if (strcmp(dp->d_name, tmp) < 0) {
 					strcpy(tmp, dp->d_name);
 				}
-				return -1;
 			}
 		}
 	}
@@ -106,6 +140,7 @@ int _dfile(char *path)
 	char cmd[200];
 
 	sprintf(datebuf, "%s/", path);
+	printf("path:%s\n", path);
 	/*找到最早的date目录*/
 	if (find_delete(path, datebuf) < 0) {
 		fprintf(stderr, "Can't find date file to delete!\n");
@@ -130,8 +165,8 @@ int _dfile(char *path)
 					return -1;
 				}
 				/*选择最早的目录*/
-				if (statbuf.st_atime < nowtime) {
-					nowtime=statbuf.st_atime;
+				if (statbuf.st_ctime < nowtime) {
+					nowtime=statbuf.st_ctime;
 					strcpy(thefile, hourbuf);
 				}
 
@@ -162,34 +197,38 @@ int _dfile(char *path)
 	return 0;
 
 }
-void release_percent(struct dirsname *dirsp)
-{
-	struct dirsname *tmp;
-	char path[300];
-	tmp = dirsp->next;
-	while ( tmp != dirsp ) {
-		sprintf(path, "%s/%s", root_dir, tmp->name);
-		if (get_fs_stat(path) < START_RELEASE) {
-			while( get_fs_stat(path) < END_RELEASE ) {
-				if (_dfile(path) < 0) { 
-					openlog("fs_write", LOG_CONS|LOG_PID, 0);
-					syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
-					fprintf(stderr, "dfile %s error!\n", path);
-				}
-			}
-		}
-		tmp = tmp->next;
-	}
-}
+int release_percent(struct dirsname *dirsp)
+  {
+  printf("enter release_percent!\n");
+  struct dirsname *tmp;
+  char path[300];
+  tmp = dirsp->next;
+  while ( tmp != dirsp ) {
+  sprintf(path, "%s/%s", root_dir, tmp->name);
+  if (get_fs_stat(path) < START_RELEASE) {
+  while( get_fs_stat(path) < END_RELEASE ) {
+  if (_dfile(path) < 0) { 
+  openlog("fs_write", LOG_CONS|LOG_PID, 0);
+  syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
+  fprintf(stderr, "dfile %s error!\n", path);
+  return -1;
+  }
+  }
+  }
+  tmp = tmp->next;
+  }
+
+  printf("leave release_percent!\n");
+  return 0;
+  }
 
 /*如果文件系统剩余空间不足则删除文件*/
 int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 {
 	char path[300];
 	struct dirsname *tmp;
-	int n, sum;
-	int flag=1;
-
+	int n, sum, i;
+	int flag = 1;
 	while (1) {
 		sum = n = 0;	
 		if (update_list( dirsp, file_size, thread_n) < 0){
@@ -207,11 +246,10 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 			sum++;
 			tmp = tmp->next;
 		}
-		if ( flag && ((float)n/sum >= 0.5)){
-			flag = 0; /*确保只有一个删除线程*/
+		if (flag  && (float)n/sum >= 0.5){
 			printf("starting delete thread!\n");
+			flag = 0;
 			start_d_thread(dirsp, &flag);
-			printf("deltete thread end!\n");
 		}  else {
 			sleep(10);
 		}

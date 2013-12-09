@@ -2,5 +2,4 @@
 #define __MAIN_H
 #include "comm.h"
 extern char root_dir[300];
-extern struct dirsname *now;
 #endif

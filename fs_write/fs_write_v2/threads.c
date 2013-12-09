@@ -6,9 +6,11 @@
  * Description : 创建写线程
  * *****************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
@@ -128,12 +130,14 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 			md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],
 			md5[14],md5[15]);
 
-	
-	
-	sprintf(newpath, "%s/%s", root_dir, tmp->name);
-	do{ ret = get_newpath(newpath, tnum);}while(ret < 0);
+
+
+	do{ 
+		sprintf(newpath, "%s/%s", root_dir, tmp->name);
+		ret = get_newpath(newpath, tnum);
+	}while(ret < 0);
+
 	strcat(newpath, newname);
-	
 	/*rename成新文件*/
 	if (rename(tmppath, newpath) < 0) {
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
@@ -172,46 +176,77 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 	return 0;
 
 }
+/*根据不同的策略 返回不同的dirsname指针*/
+struct dirsname *choose_policy(struct dirsname *dirsp,struct dirsname *bef, int thread_n, long file_size,int policy)
+{
+	struct dirsname *tmp = NULL;	
+	switch (policy) {
+		case 0:
+			tmp = get_fs_dirs_default(dirsp, bef, thread_n, file_size);
+			break;
+		case 1:
+			break;
+		case 2:
+			tmp = get_fs_dirs_by_size(dirsp);
+			break;
+		case 3:
+			tmp = get_fs_dirs_by_percent(dirsp);
+			break;
+		default:
+			break;
+	}
+	return tmp;
+}
 void *w_thread(void *arg)
 {	
 	int block_size = ((struct thread_args *)arg)->block_size;
-	int  count, tnum, time_s;
+	int thread_n, count, tnum, time_s, start, end, time;
+	long file_size;
+	int policy;
 	struct dirsname *tmp=NULL;
+	struct dirsname *tmp_bef;
 	struct dirsname *t_dirsp;
 
 	t_dirsp = (struct dirsname *)((struct thread_args *)arg)->dp;
 	tnum =(int) ((struct thread_args *)arg)->thread_num;
 	count =((struct thread_args *)arg)->file_size / block_size;
-	time_s = ((struct thread_args *)arg)->time_s;
+	time_s =(int)((struct thread_args *)arg)->time_s;
+	file_size =(long)((struct thread_args *)arg)->file_size;
+	thread_n = (int)((struct thread_args *)arg)->thread_n;
+	policy = (int)((struct thread_args *)arg)->policy;
+	time = 0;
+	tmp_bef=t_dirsp;
+	tmp = t_dirsp->next;
 
 	while (1) {
-		/*根据不同策略和条件 返回不同的tmp*/
-		if (time_s == 0){
-			tmp = get_fs_dirs(t_dirsp);
+		if (time_s){
+			tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size,policy);
+			if (time >= time_s){
+				time = 0;
+				tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size,policy);
+				printf("time out!\n");
+			}
+			start = clock();
 		} else {
-			tmp = now;
-		}
 
+			tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size, policy);
+		}
 		if ( write_file( tnum,block_size, count, tmp) < 0){
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "thread %d's error and exitting!\n",tnum);
 			fprintf(stderr, "thread %d's error and exitting!\n", tnum);
 			pthread_exit((void *)-1);
 		}
+		tmp_bef = tmp;
+		if (time_s != 0) {
+			end = clock();
+			time += (end-start)/CLOCKS_PER_SEC;
+		}
 	}
 }
-void *d_thread(void *arg)
-{
-	struct dirsname *dp = ((struct d_args *)arg)->dp;
-	int *flag = ((struct d_args *)arg)->flag;;
 
-	 release_percent(dp);
-	 *flag = 1;
-	 pthread_exit((void *)0);
-	
-}
 /*创建写线程*/
-int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int thread_n, int time_s)
+int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int thread_n, int time_s, int policy)
 {
 	int tid;
 	pthread_t id;
@@ -232,6 +267,8 @@ int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int 
 		t_args[tid]->thread_num  = tid;
 		t_args[tid]->time_s = time_s;
 		t_args[tid]->dp = dirsp;
+		t_args[tid]->thread_n = thread_n;
+		t_args[tid]->policy = policy;
 		if (pthread_create(&id, NULL, &w_thread, (void *)t_args[tid]) != 0) {
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "create write thread %d error!\n", tid);
@@ -243,7 +280,19 @@ int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int 
 
 }
 
-/*启动删除线程*/
+void *d_thread(void *arg)
+{
+	struct dirsname *dp = ((struct d_args *)arg)->dp;
+	int *flag = ((struct d_args *)arg)->flag;
+	if (release_percent(dp) < 0) {
+		fprintf(stderr, "delete thread error!\n");
+		pthread_exit((void *)-1);
+	}
+	*flag = 1;
+	printf("delete successed!\n");
+	pthread_exit((void *)0);
+
+}
 int start_d_thread(struct dirsname *dirsp, int *flag)
 {
 	pthread_t id;
@@ -259,3 +308,4 @@ int start_d_thread(struct dirsname *dirsp, int *flag)
 	}
 	return 0;
 }
+

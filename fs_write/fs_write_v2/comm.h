@@ -16,5 +16,4 @@ struct dirsname{
 };
 
 extern char root_dir[300];
-extern  struct dirsname * now;
 #endif

@@ -16,7 +16,6 @@
 #include "moniter.h"
 #include "threads.h"
 #include "main.h"
-#include "init_time.h"
 #include "list.h"
 
 
@@ -37,21 +36,14 @@ int block_size = 1024;
 int thread_n = 4;
 int time_s=0;
 char root_dir[300];
-struct dirsname *now = NULL;
 struct dirsname *dirsp=NULL;
-
-void sig_alarm(int signo)
-{
-	if (signo == SIGALRM) {
-		now = list_next(dirsp, now);
-	}
-	printf("now dir is %s\n", now->name);
-}
+char policy[20];
 
 int main(int argc, char *argv[])
 {
 
 	int c;
+	int p;
 
 	if ((argc < 2)) {
 		fprintf(stderr, "No root_dir!\n");
@@ -77,6 +69,7 @@ int main(int argc, char *argv[])
 				time_s = atoi(optarg);
 				break;
 			case 'p':
+				strcpy(policy, optarg);
 				break;
 			case 'h':
 				print_usage();
@@ -103,19 +96,13 @@ int main(int argc, char *argv[])
 		print_help();
 		return -1;
 	}
-	if (parse_args(dirsp, file_size, thread_n) < 0) {
+	if (parse_args(dirsp, file_size, thread_n, time_s, policy, &p) < 0) {
 		//fprintf(stderr, "parse_args error!\n");
 		print_help();
 		return -1;
 	}
-	
-	if (time_s != 0) {
-		if (init_time(time_s) < 0)
-			return -1;
-		now = dirsp->next;
-		signal(SIGALRM, sig_alarm);
-	}
-	if (start_w_thread(dirsp, file_size, block_size, thread_n, time_s) < 0) {
+
+	if (start_w_thread(dirsp, file_size, block_size, thread_n, time_s, p) < 0) {
 		return -1;
 	}
 	if (moniter(dirsp, file_size, thread_n) < 0) {

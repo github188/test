@@ -148,13 +148,43 @@ void print_dirsp(struct dirsname *dirsp)
 int check_dirsp(struct dirsname *dirsp)
 {
 	if (list_empty(dirsp) == 0){
-		fprintf(stderr, "have no dirs can to test!\n");
+		fprintf(stderr, "check_dirsp error! list is empty!\n");
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
-		syslog(LOG_USER|LOG_ERR, "check_dirsp error! list is empty\n");
+		syslog(LOG_USER|LOG_ERR, "check_dirsp error! list is empty!\n");
 		return -1;
 	}
 	else
 		return 0;
+}
+int check_time(int time_s)
+{
+	if (time_s < 0) {
+		fprintf(stderr, "time_s must greater than zero!\n");
+		openlog("fs_write", LOG_CONS|LOG_PID, 0);
+		syslog(LOG_USER|LOG_ERR, "time_s must greater than zero!\n");
+		return -1;
+	}
+
+	return 0;
+}
+int check_policy(char *policy, int *p)
+{
+	if (!strcmp(policy, "")) {
+		*p = 0;
+		return 0;
+	}
+	if (!strcmp(policy, "weighting")){
+		*p = 1;
+		return 0;
+	} else if (!strcmp(policy, "free-size")){
+		*p = 2;
+		return 0;
+	} else if (!strcmp(policy, "free-percent")){
+		*p = 3;
+		return 0;
+	}
+	fprintf(stderr, "policy error!policy must in {weighting|free-size|free-percent}\n");
+	return -1;
 }
 int update_list( struct dirsname *dirsp, long file_size, int thread_n)
 {
@@ -167,11 +197,12 @@ int update_list( struct dirsname *dirsp, long file_size, int thread_n)
 	if (check_fs(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
+	//print_dirsp(dirsp);
 	return 0;
 }
 
 /*参数解析*/
-int parse_args(struct dirsname *dirsp, long file_size, int thread_n)
+int parse_args(struct dirsname *dirsp, long file_size, int thread_n, int time_s, char *policy, int *p)
 {
 	if (update_list( dirsp, file_size, thread_n) < 0) {
 		return -1;
@@ -182,5 +213,11 @@ int parse_args(struct dirsname *dirsp, long file_size, int thread_n)
 	/*if (check_threadn(thread_n) < 0) {
 	  return -1;
 	  }*/
+	if (check_time(time_s) < 0) {
+		return -1;
+	}
+	if (check_policy(policy, p) < 0) {
+		return -1;
+	}
 	return 0;
 }
