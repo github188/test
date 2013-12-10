@@ -21,7 +21,11 @@
 #include "mdigest.h"
 #include "list.h"
 #include "moniter.h"
+#include "parse_args.h"
 #include "threads.h"
+
+
+static pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;	
 
 int get_random(void)
 {
@@ -79,7 +83,7 @@ int get_newpath(char *newpath, int tnum)
 	return 0;
 }
 int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
-{ 
+{  
 	int buf[block_size/4];
 	int i, j;
 	char tmppath[300]; /*线程正在写的文件的 完整路径*/
@@ -107,7 +111,7 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
 		syslog(LOG_USER|LOG_ERR, "thread %d can't open %s to write!\n",tnum,tmppath);
 		fprintf(stderr, "_w_thread can't open %s!\n", tmppath);
-		return -1;
+		return -1; 
 	}
 	md5_begin(&context);
 	/*count为写够FILE_SIZE所需要的次数*/
@@ -185,12 +189,13 @@ struct dirsname *choose_policy(struct dirsname *dirsp,struct dirsname *bef, int 
 			tmp = get_fs_dirs_default(dirsp, bef, thread_n, file_size);
 			break;
 		case 1:
+			tmp = get_fs_dirs_by_weight(dirsp, thread_n, file_size);
 			break;
 		case 2:
-			tmp = get_fs_dirs_by_size(dirsp);
+			tmp = get_fs_dirs_by_size(dirsp, thread_n, file_size);
 			break;
 		case 3:
-			tmp = get_fs_dirs_by_percent(dirsp);
+			tmp = get_fs_dirs_by_percent(dirsp, thread_n, file_size);
 			break;
 		default:
 			break;
@@ -216,15 +221,23 @@ void *w_thread(void *arg)
 	policy = (int)((struct thread_args *)arg)->policy;
 	time = 0;
 	tmp_bef=t_dirsp;
-	tmp = t_dirsp->next;
-
+	if (time_s) {
+		tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size,policy);
+	} else {
+		tmp = t_dirsp->next;
+	}
 	while (1) {
+		pthread_mutex_lock(&mutex);
+		if (update_list(t_dirsp, file_size, thread_n) < 0){
+			fprintf(stderr, "update_list error!\n");
+			openlog("fs_write", LOG_CONS|LOG_PID, 0);
+			syslog(LOG_USER|LOG_ERR, "update_list %s error!\n",tmp->name);
+		}
+		pthread_mutex_unlock(&mutex);
 		if (time_s){
-			tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size,policy);
 			if (time >= time_s){
 				time = 0;
 				tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size,policy);
-				printf("time out!\n");
 			}
 			start = clock();
 		} else {
@@ -242,14 +255,18 @@ void *w_thread(void *arg)
 			end = clock();
 			time += (end-start)/CLOCKS_PER_SEC;
 		}
+		if (policy == 1) {
+			pthread_mutex_lock(&mutex);
+			tmp->weight++;
+			pthread_mutex_unlock(&mutex);
+		}
 	}
 }
 
 /*创建写线程*/
-int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int thread_n, int time_s, int policy)
+int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int thread_n, int time_s, int policy, pthread_t *pids)
 {
 	int tid;
-	pthread_t id;
 	struct thread_args *t_args[thread_n];  /*线程的参数结构指针*/
 	printf("thread_n: %d\nfile_size:%ldM\nblock_size:%d\ntime_s:%d\n",
 			thread_n, file_size/1024/1024, block_size, time_s);
@@ -269,7 +286,7 @@ int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int 
 		t_args[tid]->dp = dirsp;
 		t_args[tid]->thread_n = thread_n;
 		t_args[tid]->policy = policy;
-		if (pthread_create(&id, NULL, &w_thread, (void *)t_args[tid]) != 0) {
+		if (pthread_create(pids+tid, NULL, &w_thread, (void *)t_args[tid]) != 0) {
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "create write thread %d error!\n", tid);
 			fprintf(stderr, "create write thread %d error!\n", tid);
@@ -282,25 +299,17 @@ int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int 
 
 void *d_thread(void *arg)
 {
-	struct dirsname *dp = ((struct d_args *)arg)->dp;
-	int *flag = ((struct d_args *)arg)->flag;
-	if (release_percent(dp) < 0) {
+	if (release_percent((char *)arg) < 0) {
 		fprintf(stderr, "delete thread error!\n");
 		pthread_exit((void *)-1);
 	}
-	*flag = 1;
-	printf("delete successed!\n");
 	pthread_exit((void *)0);
 
 }
-int start_d_thread(struct dirsname *dirsp, int *flag)
+pthread_t start_d_thread(char *path, pthread_t *flag)
 {
-	pthread_t id;
-	struct d_args args;
 
-	args.dp = dirsp;
-	args.flag = flag;
-	if (pthread_create(&id, NULL, &d_thread, (void *)&args) != 0){
+	if (pthread_create(flag, NULL, &d_thread, (void *)path) != 0){
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
 		syslog(LOG_USER|LOG_ERR, "create delete thread error!\n ");
 		fprintf(stderr, "delete thread create error!\n");

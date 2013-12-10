@@ -139,7 +139,7 @@ void print_dirsp(struct dirsname *dirsp)
 	struct dirsname *tmp;
 	tmp = dirsp->next;
 	while(tmp != dirsp){
-		printf("%s\t", tmp->name);
+		printf("%s\t %d\n", tmp->name, tmp->weight);
 		tmp = tmp->next;
 	}
 	printf("\n");

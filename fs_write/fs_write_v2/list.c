@@ -51,6 +51,7 @@ int list_add(struct dirsname *dp, char *dirname)
 		return -1;
 	}
 	strcpy(node->name, dirname);
+	node->weight = 0;
 	node->next = tmp->next;
 	tmp->next = node;
 	return 0;

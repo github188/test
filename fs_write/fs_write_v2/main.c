@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <dirent.h>
 #include <getopt.h>
 #include <signal.h>
 #include "comm.h"
@@ -17,7 +18,6 @@
 #include "threads.h"
 #include "main.h"
 #include "list.h"
-
 
 char *l_opt_arg;
 char *const short_options = "s:b:n:t:p:h";
@@ -38,7 +38,37 @@ int time_s=0;
 char root_dir[300];
 struct dirsname *dirsp=NULL;
 char policy[20];
+pthread_t *pids=NULL;
 
+void sig_int(int signo)
+{
+	int i, ret;
+	DIR *dirp;
+	struct dirent *dp;
+	char buf[300];
+
+	if (signo == SIGINT) {
+		for (i=0; i < thread_n; i++){
+			do {
+				ret = pthread_cancel(*(pids+i));
+			}while(ret);
+		}
+		if ((dirp = opendir(root_dir)) < 0) {
+			fprintf(stderr, "Can't open the root_dir!\n");
+		}
+		while (dp = readdir(dirp)) {
+			if (dp->d_type == DT_DIR) {
+				if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
+					/*过滤掉.和..*/
+					sprintf(buf, "%s/%s", root_dir, dp->d_name);
+					chdir(buf);
+					system("rm -rf tmp.*");	
+				}
+			}	
+		}
+		exit (0);
+	}
+}
 int main(int argc, char *argv[])
 {
 
@@ -91,6 +121,7 @@ int main(int argc, char *argv[])
 	}
 	dirsp->name[0] = '\0';
 	dirsp->next = dirsp;
+	dirsp->weight = 0;
 	if (chdir(root_dir) < 0) {
 		fprintf(stderr, "root_dir is invalid!\n");
 		print_help();
@@ -101,8 +132,9 @@ int main(int argc, char *argv[])
 		print_help();
 		return -1;
 	}
-
-	if (start_w_thread(dirsp, file_size, block_size, thread_n, time_s, p) < 0) {
+	signal(SIGINT, sig_int);
+	pids = (pthread_t *)malloc(sizeof(pthread_t)*thread_n);
+	if (start_w_thread(dirsp, file_size, block_size, thread_n, time_s, p, pids) < 0) {
 		return -1;
 	}
 	if (moniter(dirsp, file_size, thread_n) < 0) {

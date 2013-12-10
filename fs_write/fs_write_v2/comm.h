@@ -12,6 +12,7 @@
 struct dirsname{
 	char name[256];
 	struct dirsname *next;
+	int weight;
 	//struct list *list;
 };
 

@@ -1,4 +1,4 @@
-/*******************************************************************************
+/* *****************************************************************************
  * Author : liyunteng
  * Email : li_yunteng@163.com
  * Created Time : 2013-11-26 16:12
@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <pthread.h>
 #include <sys/statfs.h>
 #include <sys/stat.h>
@@ -47,7 +48,7 @@ float get_fs_stat(char *path)
 
 }
 /*返回剩余空间百分比最大的dirsname指针*/
-struct dirsname *get_fs_dirs_by_percent(struct dirsname *dirsp)
+struct dirsname *get_fs_dirs_by_percent(struct dirsname *dirsp, int thread_n, long file_size)
 {
 	char path[300];
 	struct dirsname *tmp=NULL;
@@ -56,7 +57,7 @@ struct dirsname *get_fs_dirs_by_percent(struct dirsname *dirsp)
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
-		if ((j = get_fs_stat(path)) > i) {
+		if ((j = get_fs_stat(path)) > i && get_fs_stat(path) > START_RELEASE && get_fs_space(path) > thread_n*file_size) {
 			i = j;
 			result = tmp;
 		}	
@@ -65,7 +66,7 @@ struct dirsname *get_fs_dirs_by_percent(struct dirsname *dirsp)
 	return result;
 }
 /*返回剩余空间最大的dirsname指针*/
-struct dirsname *get_fs_dirs_by_size(struct dirsname *dirsp)
+struct dirsname *get_fs_dirs_by_size(struct dirsname *dirsp, int thread_n, long file_size)
 {
 	char path[300];
 	struct dirsname *tmp=NULL;
@@ -74,8 +75,27 @@ struct dirsname *get_fs_dirs_by_size(struct dirsname *dirsp)
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
-		if ((j = get_fs_space(path)) > i) {
+		if ((j = get_fs_space(path)) > i && get_fs_stat(path) > START_RELEASE && get_fs_space(path) > thread_n*file_size) {
 			i = j;
+			result = tmp;
+		}	
+		tmp = tmp->next;		
+	}
+	return result;
+}
+/*返回weight最小的dirsname指针*/
+struct dirsname *get_fs_dirs_by_weight(struct dirsname *dirsp, int thread_n, long file_size)
+{
+	char path[300];
+	struct dirsname *tmp=NULL;
+	struct dirsname *result=NULL;
+	int i=INT_MAX;
+
+	tmp = dirsp->next;
+	while (tmp != dirsp) {
+		sprintf(path, "%s/%s", root_dir, tmp->name);
+		if (tmp->weight < i && get_fs_stat(path) > START_RELEASE  && get_fs_space(path) > thread_n*file_size) {
+			i = tmp->weight;
 			result = tmp;
 		}	
 		tmp = tmp->next;		
@@ -140,7 +160,6 @@ int _dfile(char *path)
 	char cmd[200];
 
 	sprintf(datebuf, "%s/", path);
-	printf("path:%s\n", path);
 	/*找到最早的date目录*/
 	if (find_delete(path, datebuf) < 0) {
 		fprintf(stderr, "Can't find date file to delete!\n");
@@ -174,6 +193,7 @@ int _dfile(char *path)
 		}
 	}
 
+	printf("path:%s\n", thefile);
 	/*删除最早的hour目录*/
 	if (n > 0) {                                                                                                             
 		sprintf(cmd, "rm -rf %s", thefile);
@@ -197,45 +217,33 @@ int _dfile(char *path)
 	return 0;
 
 }
-int release_percent(struct dirsname *dirsp)
-  {
-  printf("enter release_percent!\n");
-  struct dirsname *tmp;
-  char path[300];
-  tmp = dirsp->next;
-  while ( tmp != dirsp ) {
-  sprintf(path, "%s/%s", root_dir, tmp->name);
-  if (get_fs_stat(path) < START_RELEASE) {
-  while( get_fs_stat(path) < END_RELEASE ) {
-  if (_dfile(path) < 0) { 
-  openlog("fs_write", LOG_CONS|LOG_PID, 0);
-  syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
-  fprintf(stderr, "dfile %s error!\n", path);
-  return -1;
-  }
-  }
-  }
-  tmp = tmp->next;
-  }
+int release_percent(char  *path)
+{
+	printf("enter release_percent!\n");
+		if (get_fs_stat(path) < START_RELEASE) {
+			while( get_fs_stat(path) < END_RELEASE ) {
+				if (_dfile(path) < 0) { 
+					openlog("fs_write", LOG_CONS|LOG_PID, 0);
+					syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
+					fprintf(stderr, "dfile %s error!\n", path);
+					return -1;
+				}
+			}
+	}
 
-  printf("leave release_percent!\n");
-  return 0;
-  }
+	printf("leave release_percent!\n");
+	return 0;
+}
 
 /*如果文件系统剩余空间不足则删除文件*/
 int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 {
 	char path[300];
 	struct dirsname *tmp;
-	int n, sum, i;
-	int flag = 1;
+	int n, sum, i, j;
+	pthread_t *flag;
 	while (1) {
 		sum = n = 0;	
-		if (update_list( dirsp, file_size, thread_n) < 0){
-			fprintf(stderr, "update_list error!\n");
-			openlog("fs_write", LOG_CONS|LOG_PID, 0);
-			syslog(LOG_USER|LOG_ERR, "update_list %s error!\n",tmp->name);
-		}
 		tmp = dirsp->next;
 		while (tmp != dirsp) {
 			sprintf(path, "%s/%s", root_dir, tmp->name);
@@ -246,10 +254,30 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 			sum++;
 			tmp = tmp->next;
 		}
-		if (flag  && (float)n/sum >= 0.5){
+		printf("n:%d\t sum:%d\n",n, sum);
+		if ((float)n/sum >= 0.5){
 			printf("starting delete thread!\n");
-			flag = 0;
-			start_d_thread(dirsp, &flag);
+			i = 0;
+			flag = (pthread_t *)malloc(sizeof(pthread_t)*n);
+			tmp = dirsp->next;
+			while (tmp != dirsp) {
+				sprintf(path, "%s/%s", root_dir, tmp->name);
+				if (get_fs_stat(path) < START_RELEASE) {
+					if (start_d_thread(path, flag+i) < 0) {
+						fprintf(stderr, "create delete thread error!\n");
+						return -1;
+				 	}
+					printf("start delete threade is %u\n", (unsigned)(*(flag+i)));
+					i++;
+				}
+				tmp = tmp->next;
+			}
+			printf("n:%d\t i:%d\n",n, i);
+			for(j = 0; j<i; j++) {
+				printf("start delete threade is %u\n", (unsigned)(*(flag+j)));
+				pthread_join((pthread_t)*(flag+j), NULL);
+			}
+			printf("delete successed!\n");
 		}  else {
 			sleep(10);
 		}
