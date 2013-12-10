@@ -25,7 +25,7 @@
 #include "threads.h"
 
 
-static pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;	
+pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;	
 
 int get_random(void)
 {
@@ -294,12 +294,13 @@ int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int 
 		}
 	}
 	return 0;
-
 }
 
 void *d_thread(void *arg)
 {
-	if (release_percent((char *)arg) < 0) {
+	char path[300];
+	strcpy(path, (char *)arg);
+	if (release_percent(path) < 0) {
 		fprintf(stderr, "delete thread error!\n");
 		pthread_exit((void *)-1);
 	}

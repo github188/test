@@ -60,7 +60,7 @@ int list_del(struct dirsname *dp, char *dirname)
 {
 	struct dirsname *tmp_before = dp;
 	struct dirsname *tmp = dp->next;
-	while (tmp !=  dp){
+	do {	
 		if (!strcmp(tmp->name, dirname)) {
 			tmp_before->next = tmp->next;
 			break;
@@ -68,7 +68,7 @@ int list_del(struct dirsname *dp, char *dirname)
 			tmp_before = tmp;
 			tmp = tmp->next;
 		}
-	}
+	}while (tmp_before !=  dp);
 	return 0;
 }
 struct dirsname *list_next(struct dirsname *dp, struct dirsname *now)

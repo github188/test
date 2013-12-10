@@ -192,8 +192,6 @@ int _dfile(char *path)
 			}
 		}
 	}
-
-	printf("path:%s\n", thefile);
 	/*删除最早的hour目录*/
 	if (n > 0) {                                                                                                             
 		sprintf(cmd, "rm -rf %s", thefile);
@@ -219,19 +217,17 @@ int _dfile(char *path)
 }
 int release_percent(char  *path)
 {
-	printf("enter release_percent!\n");
-		if (get_fs_stat(path) < START_RELEASE) {
-			while( get_fs_stat(path) < END_RELEASE ) {
-				if (_dfile(path) < 0) { 
-					openlog("fs_write", LOG_CONS|LOG_PID, 0);
-					syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
-					fprintf(stderr, "dfile %s error!\n", path);
-					return -1;
-				}
+	if (get_fs_stat(path) <= START_RELEASE) {
+		while( get_fs_stat(path) <= END_RELEASE ) {
+			if (_dfile(path) < 0) { 
+				openlog("fs_write", LOG_CONS|LOG_PID, 0);
+				syslog(LOG_USER|LOG_ERR, "_dfile %s error!\n",path);
+				fprintf(stderr, "dfile %s error!\n", path);
+				return -1;
 			}
+		}
 	}
-
-	printf("leave release_percent!\n");
+	sync();
 	return 0;
 }
 
@@ -242,6 +238,17 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 	struct dirsname *tmp;
 	int n, sum, i, j;
 	pthread_t *flag;
+	
+	extern pthread_mutex_t mutex;	
+
+	pthread_mutex_lock(&mutex);
+	if (update_list(dirsp, file_size, thread_n) < 0){
+		fprintf(stderr, "update_list error!\n");
+		openlog("fs_write", LOG_CONS|LOG_PID, 0);
+		syslog(LOG_USER|LOG_ERR, "update_list error!\n");
+	}
+	pthread_mutex_unlock(&mutex);
+
 	while (1) {
 		sum = n = 0;	
 		tmp = dirsp->next;
@@ -254,7 +261,6 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 			sum++;
 			tmp = tmp->next;
 		}
-		printf("n:%d\t sum:%d\n",n, sum);
 		if ((float)n/sum >= 0.5){
 			printf("starting delete thread!\n");
 			i = 0;
@@ -262,20 +268,18 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 			tmp = dirsp->next;
 			while (tmp != dirsp) {
 				sprintf(path, "%s/%s", root_dir, tmp->name);
-				if (get_fs_stat(path) < START_RELEASE) {
+				printf("%s\n", path);
+				if (get_fs_stat(path) <= START_RELEASE) {
 					if (start_d_thread(path, flag+i) < 0) {
 						fprintf(stderr, "create delete thread error!\n");
 						return -1;
-				 	}
-					printf("start delete threade is %u\n", (unsigned)(*(flag+i)));
+					}
 					i++;
 				}
 				tmp = tmp->next;
 			}
-			printf("n:%d\t i:%d\n",n, i);
 			for(j = 0; j<i; j++) {
-				printf("start delete threade is %u\n", (unsigned)(*(flag+j)));
-				pthread_join((pthread_t)*(flag+j), NULL);
+				pthread_join(*(flag+j), NULL);
 			}
 			printf("delete successed!\n");
 		}  else {

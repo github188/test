@@ -74,7 +74,6 @@ int main(int argc, char *argv[])
 
 	int c;
 	int p;
-
 	if ((argc < 2)) {
 		fprintf(stderr, "No root_dir!\n");
 		print_help();
