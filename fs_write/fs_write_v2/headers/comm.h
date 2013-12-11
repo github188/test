@@ -5,14 +5,14 @@
 
 
 #define THREAD_MAX 32  /*最多线程个数*/
-#define START_RELEASE 0.2 /*开始删除的可用空间比*/
-#define END_RELEASE 0.4 /*删除到60%*/
+#define START_RELEASE 0.85 /*开始删除的可用空间比*/
+#define END_RELEASE 0.9 /*删除到60%*/
 
 
 struct dirsname{
 	char name[256];
 	struct dirsname *next;
-	int weight;
+	unsigned int weight;
 	//struct list *list;
 };
 

@@ -110,8 +110,10 @@ int main(int argc, char *argv[])
 		}
 
 	}
-	/*printf("file_size:%ld\nblock_size:%d\nthread_n:%d\ntime_s:%d\n", file_size,
-	  block_size, thread_n, time_s); */
+#ifdef DEBUG
+	printf("args file_size:%ld\nblock_size:%d\nthread_n:%d\ntime_s:%d\n", file_size,
+	  block_size, thread_n, time_s); 
+#endif	
 	dirsp=(struct dirsname *)malloc(sizeof(struct dirsname));
 	if (dirsp == NULL) {
 		fprintf(stderr, "malloc dirsp error!\n");

@@ -94,10 +94,7 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 	char newname[33], md5str[33];
 	md_context context; 
 
-	if (tmp == NULL) {
-		fprintf(stderr, "Can't get_fs_dirs!\n");
-		return -1;
-	}
+
 	sprintf(tmppath, "%s/%s", root_dir, tmp->name);
 	if (chdir(tmppath) < 0) {
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
@@ -246,6 +243,13 @@ void *w_thread(void *arg)
 #ifdef DEBUG
 		printf("thread:%d\tdir:%s\n",tnum, tmp->name);
 #endif
+		if (tmp == NULL) {
+			fprintf(stderr, "Can't get_fs_dirs!\n");
+			/*return -1;*/
+			/*如果tmp为null说明没有有足够空间的文件系统，等删除线程删除后继续，没必要报错
+			 * 没有有挂载文件系统的目录也没有关系，一直在这里死循环*/
+			continue;
+		}
 		if ( write_file( tnum,block_size, count, tmp) < 0){
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "thread %d's error and exitting!\n",tnum);
@@ -300,9 +304,7 @@ int start_w_thread (struct dirsname *dirsp, long file_size, int block_size, int 
 
 void *d_thread(void *arg)
 {
-	char path[300];
-	strcpy(path, (char *)arg);
-	if (release_percent(path) < 0) {
+	if (release_percent((char *)arg) < 0) {
 		fprintf(stderr, "delete thread error!\n");
 		pthread_exit((void *)-1);
 	}

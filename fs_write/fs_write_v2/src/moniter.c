@@ -90,7 +90,7 @@ struct dirsname *get_fs_dirs_by_weight(struct dirsname *dirsp, int thread_n, lon
 	char path[300];
 	struct dirsname *tmp=NULL;
 	struct dirsname *result=NULL;
-	int i=INT_MAX;
+	unsigned int i=UINT_MAX;
 
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
@@ -201,7 +201,7 @@ int _dfile(char *path)
 			return -1;
 		} else {
 #ifdef DEBUG
-			printf("delete hour dir: %s\n", thefile);
+			printf("deleted hour dir: %s\n", thefile);
 #endif	
 			n--;
 		}
@@ -215,7 +215,7 @@ int _dfile(char *path)
 			return -1;
 		}
 #ifdef DEBUG
-		printf("delete date dir: %s\n", datebuf);	
+		printf("deleted date dir: %s\n", datebuf);	
 #endif
 	}
 	sync();
@@ -243,42 +243,63 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 {
 	char path[300];
 	struct dirsname *tmp;
-	int n, sum, i, j;
+	int n, sum, i, j, x;
 	pthread_t *flag;
-	
+	char  **paths; 
+
 	while (1) {
 		sum = n = 0;	
 		tmp = dirsp->next;
 		while (tmp != dirsp) {
 			sprintf(path, "%s/%s", root_dir, tmp->name);
 			/*可用空间少于20%*/
-			if (get_fs_stat(path) < START_RELEASE) {
+			if (get_fs_stat(path) <= START_RELEASE) {
 				n++;
 			}
 			sum++;
 			tmp = tmp->next;
 		}
 		if ((float)n/sum >= 0.5){
+#ifdef DEBUG
 			printf("starting delete thread!\n");
+#endif
 			i = 0;
 			flag = (pthread_t *)malloc(sizeof(pthread_t)*n);
+			/*存放path的值，供线程使用不然会有竞争*/
+			paths = (char **)malloc(sizeof(char *)*n);
+			for (x = 0; x < n; x++) {
+				paths[x] = (char *)malloc(sizeof(char)*300);
+			}
 			tmp = dirsp->next;
 			while (tmp != dirsp) {
 				sprintf(path, "%s/%s", root_dir, tmp->name);
-				printf("%s\n", path);
 				if (get_fs_stat(path) <= START_RELEASE) {
-					if (start_d_thread(path, flag+i) < 0) {
+					strcpy(paths[i], path);
+					if (start_d_thread(paths[i], flag+i) < 0) {
 						fprintf(stderr, "create delete thread error!\n");
 						return -1;
 					}
-					i++;
+#ifdef DEBUG
+				printf("delete thread %d  into %s to delete tid:%u!\n", i, path, (unsigned)*(flag+i));
+#endif
+				i++;
 				}
 				tmp = tmp->next;
 			}
 			for(j = 0; j<i; j++) {
 				pthread_join(*(flag+j), NULL);
+#ifdef DEBUG
+				printf("delete thread %d returned tid:%u!\n", j, (unsigned)*(flag+j));
+#endif
 			}
+#ifdef DEBUG
 			printf("delete successed!\n");
+#endif
+			free(flag);
+			for (x=0; x < n; x++) {
+				free(paths[x]);
+			}
+			free(paths);
 		}  else {
 			sleep(10);
 		}

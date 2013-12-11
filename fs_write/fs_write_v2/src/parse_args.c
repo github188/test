@@ -50,6 +50,9 @@ int dir_mounted(char *dirname)
 		}
 	}
 	fclose(fp);
+#ifdef DEBUG
+	printf("%s not mounted a file system!\n", path);
+#endif
 	return -1;
 
 }
@@ -77,6 +80,7 @@ int del_list_node(struct dirsname *dirsp, char *dirname) {
 	}
 	return 0;
 }
+/*检查链表中每个都挂载了文件系统*/
 int check_fs( struct dirsname *dirsp, long file_size, int thread_n)
 {
 	struct dirsname *tmp;
