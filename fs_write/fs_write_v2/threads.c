@@ -25,7 +25,7 @@
 #include "threads.h"
 
 
-pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;	
+static pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;	
 
 int get_random(void)
 {
@@ -90,9 +90,8 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 	FILE *fp;
 	int begin, ret;
 	char newpath[400];  /*写好的文件要rename的完整路径*/  
-	char namebuf[300];	
-	unsigned char md5[16]; /*要改成的名字*/
-	unsigned char newname[33], md5str[33];
+	u8 md5[16]; /*要改成的名字*/
+	char newname[33], md5str[33];
 	md_context context; 
 
 	if (tmp == NULL) {
@@ -121,7 +120,7 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 			buf[j] = begin+j;
 		}
 		fwrite(buf, sizeof(buf), 1,  fp);
-		md5_update(&context, (char *)buf, block_size);
+		md5_update(&context, (u8 *)buf,block_size);
 	}
 	fflush(fp);
 	fsync(fileno(fp));
@@ -129,7 +128,7 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 	md5_result(&context, md5);
 
 	/*将md5转换成文件名*/	
-	sprintf(newname, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\0",
+	sprintf(newname, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 			md5[0],md5[1],md5[2],md5[3],md5[4],md5[5],md5[6],
 			md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],
 			md5[14],md5[15]);
@@ -159,12 +158,12 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 		return -1;
 	}	
 	while ((fread(buf, sizeof(buf),(size_t)1, fp))) {
-		md5_update(&context, (char *)buf, block_size);
+		md5_update(&context, (u8 *)buf, block_size);
 	}
 	fclose(fp);
 	md5_result(&context, md5);
 	/*将md5转换成字符串*/
-	sprintf(md5str, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x\0",
+	sprintf(md5str, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 			md5[0],md5[1],md5[2],md5[3],md5[4],md5[5],md5[6],
 			md5[7],md5[8],md5[9],md5[10],md5[11],md5[12],md5[13],
 			md5[14],md5[15]);
@@ -172,8 +171,8 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 	/*与文件名做比较*/
 	if (strncmp(md5str ,newname, 32) != 0){
 		openlog("fs_write", LOG_CONS|LOG_PID, 0);
-		syslog(LOG_USER|LOG_ERR, "thread %d's md5 check error!\n",tnum);
-		fprintf(stderr, "thread %d's md5 check error!\n", tnum);
+		syslog(LOG_USER|LOG_ERR, "thread %d's file %s md5 check error!\n",tnum, newpath);
+		fprintf(stderr, "thread %d's file %s md5 check error!\n", tnum, newpath);
 		return -1;
 	}  
 
@@ -244,6 +243,9 @@ void *w_thread(void *arg)
 
 			tmp = choose_policy(t_dirsp,tmp_bef, thread_n, file_size, policy);
 		}
+#ifdef DEBUG
+		printf("thread:%d\tdir:%s\n",tnum, tmp->name);
+#endif
 		if ( write_file( tnum,block_size, count, tmp) < 0){
 			openlog("fs_write", LOG_CONS|LOG_PID, 0);
 			syslog(LOG_USER|LOG_ERR, "thread %d's error and exitting!\n",tnum);

@@ -6,12 +6,13 @@
  * Description : 
  * *****************************************************************************/
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
 #include <getopt.h>
 #include <signal.h>
+#include <pthread.h>
 #include "comm.h"
 #include "parse_args.h"
 #include "moniter.h"
@@ -42,21 +43,19 @@ pthread_t *pids=NULL;
 
 void sig_int(int signo)
 {
-	int i, ret;
+	int i;
 	DIR *dirp;
 	struct dirent *dp;
 	char buf[300];
 
 	if (signo == SIGINT) {
 		for (i=0; i < thread_n; i++){
-			do {
-				ret = pthread_cancel(*(pids+i));
-			}while(ret);
+			pthread_cancel((*(pids+i)));
 		}
 		if ((dirp = opendir(root_dir)) < 0) {
 			fprintf(stderr, "Can't open the root_dir!\n");
 		}
-		while (dp = readdir(dirp)) {
+		while ((dp = readdir(dirp))) {
 			if (dp->d_type == DT_DIR) {
 				if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 					/*过滤掉.和..*/

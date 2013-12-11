@@ -1,9 +1,10 @@
 OBJECTS =  main.o moniter.o parse_args.o list.o  threads.o md5.o
 LIBES = -lpthread
 CC = gcc
-ccflags = -Wall
+DBG = 
+CCFLAGS = $(DBG)-Wall -g -ansi
 fs_write : $(OBJECTS) comm.h
-	$(CC) $(ccflags) $(OBJECTS) $(LIBES) -o fs_write
+	$(CC) $(CCFLAGS) $(OBJECTS) $(LIBES) -o fs_write
 
 $(OBJECTS) : comm.h
 md5.o : byteorder.h mdigest.h

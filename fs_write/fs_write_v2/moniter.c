@@ -9,12 +9,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdint.h>
+#include <dirent.h>
 #include <limits.h>
 #include <pthread.h>
-#include <sys/statfs.h>
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #include <string.h>
-#include <dirent.h>
 #include <time.h>
 #include "parse_args.h"
 #include "comm.h"
@@ -23,7 +24,7 @@
 #include "threads.h"
 
 /*返回dirname目录挂载的文件系统可用空间*/
-long get_fs_space(char *path)
+uint64_t get_fs_space(char *path)
 {
 	struct statfs fsbuf;
 
@@ -31,7 +32,7 @@ long get_fs_space(char *path)
 		fprintf(stderr, "Can't get %s's statfs!\n", path);
 		return -1;
 	}
-	return fsbuf.f_bavail * fsbuf.f_bsize;	
+	return (uint64_t)fsbuf.f_bavail * fsbuf.f_bsize;	
 }
 
 /*返回dirname挂在的文件系统剩余空间百分比*/
@@ -57,7 +58,7 @@ struct dirsname *get_fs_dirs_by_percent(struct dirsname *dirsp, int thread_n, lo
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
-		if ((j = get_fs_stat(path)) > i && get_fs_stat(path) > START_RELEASE && get_fs_space(path) > thread_n*file_size) {
+		if ((j = get_fs_stat(path)) > i && get_fs_stat(path) > START_RELEASE && get_fs_space(path) > (uint64_t)thread_n*file_size) {
 			i = j;
 			result = tmp;
 		}	
@@ -71,11 +72,11 @@ struct dirsname *get_fs_dirs_by_size(struct dirsname *dirsp, int thread_n, long 
 	char path[300];
 	struct dirsname *tmp=NULL;
 	struct dirsname *result=NULL;
-	float i = 0.0, j;
+	uint64_t i = 0, j;
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
-		if ((j = get_fs_space(path)) > i && get_fs_stat(path) > START_RELEASE && get_fs_space(path) > thread_n*file_size) {
+		if ((j = get_fs_space(path)) > i && get_fs_stat(path) > START_RELEASE && get_fs_space(path) > (uint64_t)thread_n*file_size) {
 			i = j;
 			result = tmp;
 		}	
@@ -94,7 +95,7 @@ struct dirsname *get_fs_dirs_by_weight(struct dirsname *dirsp, int thread_n, lon
 	tmp = dirsp->next;
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
-		if (tmp->weight < i && get_fs_stat(path) > START_RELEASE  && get_fs_space(path) > thread_n*file_size) {
+		if (tmp->weight < i && get_fs_stat(path) > START_RELEASE  && get_fs_space(path) > (uint64_t)thread_n*file_size) {
 			i = tmp->weight;
 			result = tmp;
 		}	
@@ -113,7 +114,7 @@ struct dirsname *get_fs_dirs_default(struct dirsname *dirsp,struct dirsname *tmp
 	do{
 		sprintf(path, "%s/%s", root_dir, result->name);
 		//printf("result->name:%s\t get_fs_space:%ld\t file_size*n:%ld\n",tmp->name, get_fs_space(path), thread_n*file_size);
-		if ((get_fs_stat(path)) > START_RELEASE && get_fs_space(path) >  thread_n*file_size ) {
+		if ((get_fs_stat(path)) > START_RELEASE && get_fs_space(path) >  (uint64_t)thread_n*file_size ) {
 			return result;
 		}
 		result = result->next;
@@ -133,7 +134,7 @@ int find_delete(char *path, char *buf)
 		closedir(dirp);
 		return -1;
 	}
-	while (dp = readdir(dirp)) {
+	while ((dp = readdir(dirp))) {
 		if (dp->d_type == DT_DIR){
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 				if (strcmp(dp->d_name, tmp) < 0) {
@@ -199,6 +200,9 @@ int _dfile(char *path)
 			fprintf(stderr, "Can't delete the file %s!/n", thefile);
 			return -1;
 		} else {
+#ifdef DEBUG
+			printf("delete hour dir: %s\n", thefile);
+#endif	
 			n--;
 		}
 	}
@@ -210,6 +214,9 @@ int _dfile(char *path)
 			fprintf(stderr, "_dfile can't delete %s\n", datebuf);
 			return -1;
 		}
+#ifdef DEBUG
+		printf("delete date dir: %s\n", datebuf);	
+#endif
 	}
 	sync();
 	return 0;
@@ -239,16 +246,6 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n)
 	int n, sum, i, j;
 	pthread_t *flag;
 	
-	extern pthread_mutex_t mutex;	
-
-	pthread_mutex_lock(&mutex);
-	if (update_list(dirsp, file_size, thread_n) < 0){
-		fprintf(stderr, "update_list error!\n");
-		openlog("fs_write", LOG_CONS|LOG_PID, 0);
-		syslog(LOG_USER|LOG_ERR, "update_list error!\n");
-	}
-	pthread_mutex_unlock(&mutex);
-
 	while (1) {
 		sum = n = 0;	
 		tmp = dirsp->next;

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -62,7 +63,7 @@ int dir_enough_space(char *dirname, long file_size, int thread_n)
 
 	/*判断文件系统是否有足够的空间*/
 	do  {ret = statfs(path, &statbuf);} while(ret < 0);
-	if (statbuf.f_bavail * statbuf.f_bsize < file_size * thread_n) {
+	if ((uint64_t)((uint64_t)statbuf.f_bavail*statbuf.f_bsize) < (uint64_t)(file_size * thread_n)) {
 		return -1;
 	}
 	return 0;
@@ -86,15 +87,15 @@ int check_fs( struct dirsname *dirsp, long file_size, int thread_n)
 		if (dir_mounted(tmp->name) < 0) {
 			do {ret =  del_list_node(dirsp, tmp->name); } while (ret < 0);
 		}
-		if (dir_enough_space(tmp->name, file_size, thread_n) < 0) {
+	/*	if (dir_enough_space(tmp->name, file_size, thread_n) < 0) {
 			do {ret =  del_list_node(dirsp, tmp->name); } while (ret < 0);
-		} 
+		} */ /*不需要删除，在不同的策略中有判断*/ 
 		tmp = tmp->next;
 	}
 	return 0;
 
 }
-/*将root_dir的子目录放到链表中*/
+/*将root_dir的挂载文件系统的子目录放到链表中*/
 int get_dirs(struct dirsname *dirsp)
 {
 	int i=0;
@@ -111,9 +112,10 @@ int get_dirs(struct dirsname *dirsp)
 			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
 				/*过滤掉.和..*/
 				/*将链表中没有的目录加到链表中*/
-
-				do { ret = list_add(dirsp, dp->d_name); } while (ret < 0);
-				i++;
+				if (!dir_mounted(dp->d_name)) {
+					do { ret = list_add(dirsp, dp->d_name); } while (ret < 0);
+					i++;
+				}
 			}
 		}
 	}
@@ -139,7 +141,7 @@ void print_dirsp(struct dirsname *dirsp)
 	struct dirsname *tmp;
 	tmp = dirsp->next;
 	while(tmp != dirsp){
-		printf("%s\t %d\n", tmp->name, tmp->weight);
+		printf("%s : %d\t", tmp->name, tmp->weight);
 		tmp = tmp->next;
 	}
 	printf("\n");
@@ -186,6 +188,7 @@ int check_policy(char *policy, int *p)
 	fprintf(stderr, "policy error!policy must in {weighting|free-size|free-percent}\n");
 	return -1;
 }
+/*添加目录中新挂载的文件系统目录到链表， 删除链表中没有挂载文件系统的项*/
 int update_list( struct dirsname *dirsp, long file_size, int thread_n)
 {
 
@@ -197,7 +200,9 @@ int update_list( struct dirsname *dirsp, long file_size, int thread_n)
 	if (check_fs(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}
-	//print_dirsp(dirsp);
+#ifdef DEBUG
+	print_dirsp(dirsp);
+#endif
 	return 0;
 }
 
