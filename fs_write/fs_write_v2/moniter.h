@@ -5,7 +5,7 @@
 
 
 int release_percent(char *);
-int moniter(struct dirsname *, long file_size, int thread_n);
+int moniter(struct dirsname *, long file_size, int thread_n, pthread_t *);
 struct dirsname *get_fs_dirs_by_percent(struct dirsname *, int, long);
 struct dirsname *get_fs_dirs_by_size(struct dirsname *, int, long);
 struct dirsname *get_fs_dirs_by_weight(struct dirsname *, int, long);

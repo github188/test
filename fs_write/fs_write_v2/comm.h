@@ -2,7 +2,7 @@
 #define __COMM
 #include <stdio.h>
 #include <syslog.h>
-
+#include <errno.h>
 
 #define THREAD_MAX 32  /*最多线程个数*/
 #define START_RELEASE 0.2 /*开始删除的可用空间比*/

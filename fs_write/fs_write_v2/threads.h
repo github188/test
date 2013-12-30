@@ -1,4 +1,5 @@
 #ifndef __W_THREAD
+#include <pthread.h>
 #define __W_THREAD
 #define FILE_MOD S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH
 /*pthread_t threads[THREAD_MAX];*/
