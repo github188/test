@@ -122,7 +122,7 @@ struct dirsname * get_fs_dirs_default(struct dirsname *dirsp, struct dirsname *t
 	struct dirsname *tmp;
 	struct dirsname *result;
 
-	tmp = result = list_next(dirsp, tmp_bef);
+	tmp = result = fs_list_next(dirsp, tmp_bef);
 	do {
 		sprintf(path, "%s/%s", root_dir, result->name);
 		//printf("result->name:%s\t get_fs_space:%ld\t file_size*n:%ld\n",tmp->name, get_fs_space(path), thread_n*file_size);

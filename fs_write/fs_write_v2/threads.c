@@ -263,8 +263,8 @@ void * w_thread(void *arg)
 			}
 			start = clock();
 		} else {
-			tmp = choose_policy(t_dirsp, tmp_bef, thread_n, file_size,
-					      policy);
+			/* tmp = choose_policy(t_dirsp, tmp_bef, thread_n, file_size,
+					      policy); */
 		}
 #ifdef DEBUG
 		printf("thread:%d\tdir:%s\n", tnum, tmp->name);

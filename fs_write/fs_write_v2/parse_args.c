@@ -109,7 +109,7 @@ int dir_enough_space(char *dirname, long file_size, int thread_n)
 /*删除链表中name值为dirname的*/
 int del_list_node(struct dirsname *dirsp, char *dirname)
 {
-	if (list_del(dirsp, dirname) < 0) {
+	if (fs_list_del(dirsp, dirname) < 0) {
 		fprintf(stderr, "delete %s from list error : %s\n", dirname,
 			strerror(errno));
 		return -1;
@@ -160,7 +160,7 @@ int get_dirs(struct dirsname *dirsp)
 				/*将链表中没有的目录加到链表中 */
 				if (!dir_mounted(dp->d_name)) {
 					do {
-						ret = list_add(dirsp, dp->d_name);
+						ret = fs_list_add(dirsp, dp->d_name);
 					} while (ret < 0);
 					i++;
 				}
@@ -223,7 +223,7 @@ void print_dirsp(struct dirsname *dirsp)
 /*检查链表是否为空*/
 int check_dirsp(struct dirsname *dirsp)
 {
-	if (list_empty(dirsp) == 0) {
+	if (fs_list_empty(dirsp) == 0) {
 		fprintf(stderr, "check_dirsp error! list is empty!\n");
 		openlog("fs_write", LOG_CONS | LOG_PID, 0);
 		syslog(LOG_USER | LOG_ERR,
