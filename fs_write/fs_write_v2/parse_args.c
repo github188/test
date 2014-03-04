@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <sys/vfs.h>
 #include "comm.h"
-#include "list.h"
+#include "fs_list.h"
 #include "parse_args.h"
 
 extern long file_size;
@@ -39,23 +39,15 @@ void print_help(void)
 void print_usage(void)
 {
 	printf("fs_write, version 0.2\n");
-	printf
-		("Usage: fs_write -d root_dir [[-s file_size] [-b block_size] [-n thread_n]\n");
-	printf("\t\t[-i interval] [-p choose-policy]]\n");
-	printf
-		("\t-d --dir	   :root_dir \tthe dir include mountpoints.\n\n");
-	printf
-		("\t-s --file-size  :file_size \tthe filesize the unit is M default is 256M.\n");
-	printf
-		("\t-b --block-size :block_size\tthe blocksize of the file to write,default is 1024.\n");
-	printf
-		("\t-n --threadn    :thread_n    \tthe number of write thread, should be lower 32 default is 4.\n");
-	printf
-		("\t-i --interval   :time_s      \tevery seconds change the mountpoints to write. \n");
-	printf
-		("\t\t\t\t\tif time_s=0 the thread will choose fs to write after write one file.\n");
-	printf
-		("\t-p --choose-policy:policy    \tthe policy used by write thread to choose file system.\n");
+	printf("Usage: fs_write -d <root_dir> [[-s <file_size>] [-b <block_size>] [-n <thread_n>]\n");
+	printf("\t\t[-i <interval>] [-p <choose-policy>]]\n");
+	printf("\t-d --dir	  :root_dir \tthe dir include mountpoints.\n\n");
+	printf("\t-s --file-size  :file_size \tthe filesize the unit is M default is 256M.\n");
+	printf("\t-b --block-size :block_size\tthe blocksize of the file to write,default is 1024.\n");
+	printf("\t-n --threadn    :thread_n    \tthe number of write thread, should be lower 32 default is 4.\n");
+	printf("\t-i --interval   :time_s      \tevery seconds change the mountpoints to write. \n");
+	printf("\t\t\t\t\tif time_s=0 the thread will choose fs to write after write one file.\n");
+	printf("\t-p --choose-policy:policy    \tthe policy used by write thread to choose file system.\n");
 	printf("\t\t\t\t\tit can be one of {weighting|free-size|free-percent}.\
 n");
 	printf("\n\n");
@@ -67,7 +59,8 @@ int dir_mounted(char *dirname)
 	FILE *fp;
 	char buf[500];
 	char path[300];
-
+	const char *delim = " ";
+	
 	if ((fp = fopen("/proc/mounts", "r")) == NULL) {
 		fprintf(stderr, "Can't open /proc/mounts : %s\n",
 			strerror(errno));
@@ -75,7 +68,12 @@ int dir_mounted(char *dirname)
 	}
 	sprintf(path, "%s/%s", root_dir, dirname);
 	while (fgets(buf, 499, fp) > 0) {
-		if (strstr(buf, path) != NULL) {
+		/* 精确匹配 */
+		char *s, *p = NULL;
+	       
+		s = strtok_r(buf, delim, &p);
+		s = strtok_r(NULL, delim, &p);
+		if (strcmp(path, s) == 0) {
 			fclose(fp);
 			return 0;
 		}
@@ -162,8 +160,7 @@ int get_dirs(struct dirsname *dirsp)
 				/*将链表中没有的目录加到链表中 */
 				if (!dir_mounted(dp->d_name)) {
 					do {
-						ret =
-							list_add(dirsp, dp->d_name);
+						ret = list_add(dirsp, dp->d_name);
 					} while (ret < 0);
 					i++;
 				}
@@ -173,8 +170,7 @@ int get_dirs(struct dirsname *dirsp)
 
 	closedir(dirp);
 	if (i == 0) {
-		fprintf(stderr,
-			"Don't have any child dir mounted file system!\n");
+		fprintf(stderr, "Don't have any child dir mounted file system!\n");
 		return -1;
 	}
 	return 0;
@@ -270,6 +266,33 @@ int check_policy(char *policy, int *p)
 	return -1;
 }
 
+int check_rootdir(void)
+{
+		
+	if (root_dir[0] == '\0') {
+		fprintf(stderr, "root_dir is invalid.\n");
+		return -1;
+	}
+
+	if (root_dir[strlen(root_dir) - 1] == '/') {
+		if ((strcmp(root_dir, "/") != 0) && (strcmp(root_dir, "./") != 0))
+			root_dir[strlen(root_dir) - 1] = '\0';
+	}
+	
+	if (root_dir[0] != '/') {
+		char buf[300];
+		getcwd(buf, 300);
+		int i = strlen(buf);
+		buf[i] = '/';
+		buf[i+1] = '\0';
+		strcat(buf, root_dir);
+		strcpy(root_dir, buf);
+	}
+	printf("root_dir:%s\n", root_dir);
+	return 0;
+
+}
+
 /*添加目录中新挂载的文件系统目录到链表， 删除链表中没有挂载文件系统的项*/
 int update_list(struct dirsname *dirsp, long file_size, int thread_n)
 {
@@ -289,23 +312,14 @@ int update_list(struct dirsname *dirsp, long file_size, int thread_n)
 
 int my_getopt(int argc, char **argv)
 {
-	char buf[300];
 	int c;
 
-	while ((c =
-		getopt_long(argc, (char *const *) argv, short_options,
+	while ((c = getopt_long(argc, (char *const *) argv, short_options,
 			    long_options, NULL)) != -1) {
 		switch (c) {
 		case 'd':
-			strcpy(buf, optarg);
-			if (buf[strlen(buf) - 1] == '/') {
-				buf[strlen(buf) - 1] = '\0';
-			}
-			if (buf[0] != '/') {
-				getcwd(root_dir, 300);
-				root_dir[strlen(root_dir) - 1] = '/';
-			}
-			strcat(root_dir, buf);
+			strncpy(root_dir, optarg, sizeof(root_dir
+					));
 			break;
 		case 's':
 			file_size = atol(optarg) * 1024 * 1024;
@@ -328,10 +342,7 @@ int my_getopt(int argc, char **argv)
 			break;
 		}
 	}
-	if (!strcmp(root_dir, "")) {
-		fprintf(stderr, "must appoint root_dir!\n");
-		return -1;
-	}
+
 	return 0;
 
 #ifdef DEBUG
@@ -349,6 +360,10 @@ parse_args(struct dirsname *dirsp, int argc, char *argv[], int *p)
 		return -1;
 	}
 
+	if (check_rootdir() < 0) {
+		return -1;
+	}
+	
 	if (update_list(dirsp, file_size, thread_n) < 0) {
 		return -1;
 	}

@@ -20,7 +20,7 @@
 #include <time.h>
 #include "comm.h"
 #include "mdigest.h"
-#include "list.h"
+#include "fs_list.h"
 #include "moniter.h"
 #include "parse_args.h"
 #include "threads.h"
@@ -105,16 +105,7 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 	char newname[33], md5str[33];
 	md_context context;
 
-	sprintf(tmppath, "%s/%s", root_dir, tmp->name);
-	if (chdir(tmppath) < 0) {
-		openlog("fs_write", LOG_CONS | LOG_PID, 0);
-		syslog(LOG_USER | LOG_ERR,
-		       "thread %d can't change dir to %s!\n", tnum, tmppath);
-		fprintf(stderr, "thread %d can't into  %s : %s\n", tnum,
-			tmppath, strerror(errno));
-		return -1;
-	}
-	sprintf(tmppath, "%s/tmp.%d", tmppath, tnum);
+	sprintf(tmppath, "%s/%s/tmp.%d", root_dir, tmp->name, tnum);
 	if ((fp = fopen(tmppath, "w")) == NULL) {
 		openlog("fs_write", LOG_CONS | LOG_PID, 0);
 		syslog(LOG_USER | LOG_ERR,
@@ -197,6 +188,10 @@ int write_file(int tnum, int block_size, int count, struct dirsname *tmp)
 
 }
 
+int jugement_crond(int time_s) {
+	return time_s;
+}
+
 /*根据不同的策略 返回不同的dirsname指针*/
 struct dirsname * choose_policy(struct dirsname *dirsp, struct dirsname *bef, int thread_n,
 				long file_size, int policy)
@@ -208,6 +203,9 @@ struct dirsname * choose_policy(struct dirsname *dirsp, struct dirsname *bef, in
 		break;
 	case 1:
 		tmp = get_fs_dirs_by_weight(dirsp, thread_n, file_size);
+		pthread_mutex_lock(&mutex);
+		tmp->weight++;
+		pthread_mutex_unlock(&mutex);
 		break;
 	case 2:
 		tmp = get_fs_dirs_by_size(dirsp, thread_n, file_size);
@@ -241,10 +239,10 @@ void * w_thread(void *arg)
 	policy = (int) ((struct thread_args *) arg)->policy;
 	time = 0;
 	tmp_bef = t_dirsp;
-	if (time_s) {
-		tmp =
-			choose_policy(t_dirsp, tmp_bef, thread_n, file_size,
-				      policy);
+	
+	if (jugement_crond(time_s)) {
+		tmp = choose_policy(t_dirsp, tmp_bef, thread_n, file_size,
+				    policy);
 	} else {
 		tmp = t_dirsp->next;
 	}
@@ -257,18 +255,15 @@ void * w_thread(void *arg)
 			       tmp->name);
 		}
 		pthread_mutex_unlock(&mutex);
-		if (time_s) {
+		if (jugement_crond(time_s)) {
 			if (time >= time_s) {
 				time = 0;
-				tmp =
-					choose_policy(t_dirsp, tmp_bef, thread_n,
-						      file_size, policy);
+				tmp = choose_policy(t_dirsp, tmp_bef, thread_n,
+						    file_size, policy);
 			}
 			start = clock();
 		} else {
-
-			tmp =
-				choose_policy(t_dirsp, tmp_bef, thread_n, file_size,
+			tmp = choose_policy(t_dirsp, tmp_bef, thread_n, file_size,
 					      policy);
 		}
 #ifdef DEBUG
@@ -281,9 +276,6 @@ void * w_thread(void *arg)
 			 * 没有有挂载文件系统的目录也没有关系，一直在这里死循环*/
 			continue;
 		}
-		pthread_mutex_lock(&mutex);
-		tmp->weight++;
-		pthread_mutex_unlock(&mutex);
 		if (write_file(tnum, block_size, count, tmp) < 0) {
 			openlog("fs_write", LOG_CONS | LOG_PID, 0);
 			syslog(LOG_USER | LOG_ERR,
@@ -294,19 +286,19 @@ void * w_thread(void *arg)
 			pthread_exit((void *) -1);
 		}
 		tmp_bef = tmp;
-		if (time_s != 0) {
+		if (jugement_crond(time_s)) {
 			end = clock();
 			time += (end - start) / CLOCKS_PER_SEC;
 		}
 		if (exitcode) {
-		/*	sprintf(cmd, "rm -rf %s/%s/tmp.*", root_dir, tmp->name); 
-#ifdef DEBUG
-			printf("thread %d %s\n", tnum, cmd);
-#endif
-			if (system(cmd) < 0) {
+			/*	sprintf(cmd, "rm -rf %s/%s/tmp.*", root_dir, tmp->name); 
+				#ifdef DEBUG
+				printf("thread %d %s\n", tnum, cmd);
+				#endif
+				if (system(cmd) < 0) {
 				fprintf(stderr, "delete %s error : %s\n",
-					tmp->name, strerror(errno));
-			}
+				tmp->name, strerror(errno));
+				}
 			*/
 #ifdef DEBUG
 			printf("thread %d exit\n", tnum);
@@ -324,11 +316,10 @@ int start_w_thread(struct dirsname *dirsp, long file_size, int block_size,
 	struct thread_args *t_args[thread_n];	/*线程的参数结构指针 */
 	printf("thread_n: %d\nfile_size:%ldM\nblock_size:%d\ntime_s:%d\n",
 	
-       thread_n, file_size / 1024 / 1024, block_size, time_s);
+	       thread_n, file_size / 1024 / 1024, block_size, time_s);
 
 	for (tid = 0; tid < thread_n; tid++) {
-		t_args[tid] =
-			(struct thread_args *) malloc(sizeof (struct thread_args));
+		t_args[tid] = (struct thread_args *) malloc(sizeof (struct thread_args));
 		if (t_args[tid] == NULL) {
 			fprintf(stderr, "thread %d malloc error : %s\n", tid,
 				strerror(errno));
@@ -344,9 +335,8 @@ int start_w_thread(struct dirsname *dirsp, long file_size, int block_size,
 		t_args[tid]->dp = dirsp;
 		t_args[tid]->thread_n = thread_n;
 		t_args[tid]->policy = policy;
-		if ((err =
-		     pthread_create(pids + tid, NULL, &w_thread,
-				    (void *) t_args[tid])) != 0) {
+		if ((err = pthread_create(pids + tid, NULL, &w_thread,
+					  (void *) t_args[tid])) != 0) {
 			openlog("fs_write", LOG_CONS | LOG_PID, 0);
 			syslog(LOG_USER | LOG_ERR,
 			       "create write thread %d error!\n", tid);

@@ -17,7 +17,7 @@
 #include "moniter.h"
 #include "threads.h"
 #include "main.h"
-#include "list.h"
+#include "fs_list.h"
 
 long file_size = 268435456;
 int block_size = 1024;
@@ -36,21 +36,7 @@ static void sig_int (int signo)
 #ifdef DEBUG
 		printf("catch SIGINT\n");
 #endif
-		/*for (i=0; i < thread_n; i++){
-		  pthread_cancel((*(pids+i)));
-		  }
-		  if ((dirp = opendir(root_dir)) < 0) {
-		  fprintf(stderr, "Can't open the root_dir!\n");
-		  }
-		  while ((dp = readdir(dirp))) {
-		  if (dp->d_type == DT_DIR) {
-		  if (strcmp(dp->d_name, ".") && strcmp(dp->d_
-		  sprintf(buf, "%s/%s", root_dir, dp->d_name);
-		  chdir(buf);
-		  system("rm -rf tmp.*");      
-		  }
-		  }
-		  exit (0); */
+
 	}
 }
 
@@ -58,9 +44,7 @@ int main(int argc, char *argv[])
 {
 	int p;
 
-	if ((argc < 2)) {fprintf(stderr, "No root_dir!\n"); print_help();
-		return -1;
-	}
+
 	dirsp = (struct dirsname *) malloc(sizeof (struct dirsname));
 	if (dirsp == NULL) {
 		fprintf(stderr, "malloc error : %s", strerror(errno));
@@ -70,11 +54,6 @@ int main(int argc, char *argv[])
 	dirsp->next = dirsp;
 	dirsp->weight = 0;
 
-	/*    if (chdir(root_dir) < 0) {
-	      fprintf(stderr, "chdir %s : %s", root_dir, strerror(errno));
-	      print_help();
-	      return -1;
-	      } */
 	if (parse_args(dirsp, argc, argv, &p) < 0) {
 		print_help();
 		return -1;
@@ -83,11 +62,12 @@ int main(int argc, char *argv[])
 	pids = (pthread_t *) malloc(sizeof (pthread_t) * thread_n);
 	if (start_w_thread(dirsp, file_size, block_size,
 			   thread_n, time_s, p, pids) < 0) {
+		free(pids);
 		return -1;
 	}
 	if (moniter(dirsp, file_size, thread_n, pids) < 0) {
+		free(pids);
 		return -1;
 	}
 	return 0;
-				
 }

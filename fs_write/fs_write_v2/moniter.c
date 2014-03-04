@@ -19,7 +19,7 @@
 #include <time.h>
 #include "parse_args.h"
 #include "comm.h"
-#include "list.h"
+#include "fs_list.h"
 #include "moniter.h"
 #include "threads.h"
 
@@ -135,12 +135,23 @@ struct dirsname * get_fs_dirs_default(struct dirsname *dirsp, struct dirsname *t
 	return NULL;
 }
 
-int find_delete(char *path, char *buf)
+
+int _dfile(char *path)
 {
+
+	int n = 0;
 	DIR *dirp;
 	struct dirent *dp;
+	struct stat statbuf;
+	char datebuf[300];
+	char hourbuf[200];
+	char thefile[300];
+	time_t nowtime;
+	char cmd[400];
 	char tmp[100] = "9999999999";
 
+	/*找到最早的date目录 */
+	sprintf(datebuf, "%s/", path);
 	//strcpy(tmp,"999999999\0");
 	if (!(dirp = opendir(path))) {
 		fprintf(stderr, "Can't open the dir %s: %s\n", path,
@@ -157,31 +168,11 @@ int find_delete(char *path, char *buf)
 			}
 		}
 	}
-	closedir(dirp);
-	strcat(buf, tmp);
-	return 0;
-}
-
-int _dfile(char *path)
-{
-
-	int n = 0;
-	DIR *dirp;
-	struct dirent *dp;
-	struct stat statbuf;
-	char datebuf[200];
-	char hourbuf[200];
-	char thefile[300];
-	time_t nowtime;
-	char cmd[200];
-
-	sprintf(datebuf, "%s/", path);
-	/*找到最早的date目录 */
-	if (find_delete(path, datebuf) < 0) {
-		fprintf(stderr, "Can't find date file to delete!\n");
-		return -1;
-	}
-	//      printf("the date file  is %s\n", datebuf);
+	strcat(datebuf, tmp);
+#ifdef DEBUG
+	printf("find date file : %s\n", datebuf);
+#endif	
+	
 	/*找到最早的hour目录 */
 	time(&nowtime);
 	if ((dirp = opendir(datebuf)) < 0) {
@@ -211,11 +202,12 @@ int _dfile(char *path)
 			}
 		}
 	}
-	/*删除最早的hour目录 */
+	/* 删除最早的hour目录*/
 	if (n > 0) {
 		sprintf(cmd, "rm -rf %s", thefile);
+
 		if (system(cmd) < 0) {
-			fprintf(stderr, "Can't delete the file %s: %s/n",
+			fprintf(stderr, "Can't delete the file %s: %s\n",
 				thefile, strerror(errno));
 			return -1;
 		} else {
@@ -225,8 +217,7 @@ int _dfile(char *path)
 			n--;
 		}
 	}
-
-	/*删除空date目录 */
+/*删除空date目录 */
 	if (n == 0) {
 		sprintf(cmd, "rm -rf %s", datebuf);
 		if (system(cmd) < 0) {
@@ -338,6 +329,7 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n, pthread_t * pi
 			for (i = 0; i < thread_n; i++) {
 				pthread_join(*(pids + i), NULL);
 			}
+			free(pids);
 			exit(-1);
 		}
 	}
