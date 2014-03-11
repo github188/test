@@ -6,7 +6,7 @@ OBJECTS = led_ev.o led_work.o led_worker.o list.o main.o
 
 all: server libpic.a client
 	$(MAKE) -C client
-server:$(OBJECTS) libpic.a client
+server:$(OBJECTS) libpic.a 
 	$(CC) -o server $(OBJECTS) ./pic_ctl/libpic.a $(CFLAGS) $(LDFLAGS)
 libpic.a:
 	$(MAKE) -C pic_ctl

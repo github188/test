@@ -2,15 +2,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
-#include <arpa/inet.h>
+#include <sys/un.h>
 #include <errno.h>
 
 #include "../common.h"
 
-#define  PORT  9001
-#define  IP  "127.0.0.1"
+#define UNIX_DOMAIN	"/tmp/.led_socket"
 
 int expire;
 char *l_opt_arg;
@@ -113,20 +111,17 @@ int main(int argc, char *argv[])
 	       data.disk_id, data.mode, data.time, data.freq, data.count);
 	
 	int sock_fd;
-	struct sockaddr_in s_addr;
+	struct sockaddr_un s_addr;
 	socklen_t addr_len;
 	int len;
-	struct msghdr msg;
-	struct iovec iov[1];
 	
-	sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	sock_fd = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if (sock_fd < 0) {
 		fprintf(stderr, "create socket failed.\n");
 		return -1;
 	}
-	s_addr.sin_family = AF_INET;
-	s_addr.sin_port = htons(PORT);
-	inet_pton(AF_INET, IP, &s_addr.sin_addr);
+	s_addr.sun_family = AF_UNIX;
+	strncpy(s_addr.sun_path, UNIX_DOMAIN, sizeof(s_addr.sun_path)-1);
 	addr_len = sizeof(s_addr);
 
 

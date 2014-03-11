@@ -2,6 +2,7 @@
 #define COMMON__H__
 #include "list.h"
 
+#define UNIX_DOMAIN	"/tmp/.led_socket"
 #define MODE_ON		0
 #define MODE_OFF	1
 #define MODE_BLINK	2
@@ -14,7 +15,7 @@
 #define COUNT_NORMAL	4
 #define COUNT_SLOW	8
 
-#define TIME_DEFAULT 10000
+#define TIME_FOREVER	-200
 /* 工作的参数 */
 typedef struct led_work_args led_work_args_t;
 struct led_work_args {

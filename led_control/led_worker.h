@@ -4,7 +4,7 @@
 #include "common.h"
 #define WORKER_TIMER .125
 
-
+void work_release(led_work_t *work);
 void led_on(led_work_args_t *data);
 void worker_init(void);
 

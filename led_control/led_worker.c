@@ -8,7 +8,6 @@
 extern struct list _g_led_list;
 static ev_timer worker_timer;
 extern struct ev_loop *led_loop;
-extern int sts[];
 static int i;
 void work_release(led_work_t *work)
 {
@@ -19,8 +18,9 @@ void work_release(led_work_t *work)
 
 void led_on(led_work_args_t *data)
 {
-	if (data->time <= 0) {
+	if (data->time <= 0 && data->time != TIME_FOREVER) {
 		work_release(list_struct_base(data, led_work_t, data));
+		pic_write_disk(data->disk_id, PIC_LED_OFF);
 		return;
 	}
 	
@@ -60,12 +60,11 @@ void led_on(led_work_args_t *data)
 			}
 		}
 	}
-	data->time = data->time - WORKER_TIMER*1000;
-	if (data->time <=0 ) {
-		if (pic_write_disk(data->disk_id, sts[data->disk_id]) != 0) {
-			fprintf(stderr, "restore origin status failed.\n");
-		}
+	if (data->time != TIME_FOREVER)
+		data->time = data->time - WORKER_TIMER*1000;
+	if (data->time <=0 && data->time != TIME_FOREVER ) {
 		work_release(list_struct_base(data, led_work_t, data));
+		pic_write_disk(data->disk_id, PIC_LED_OFF);
 	}
 	return;
 }
