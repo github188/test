@@ -3,6 +3,7 @@
 #include "list.h"
 
 #define UNIX_DOMAIN	"/tmp/.led_socket"
+
 #define MODE_ON		0
 #define MODE_OFF	1
 #define MODE_BLINK	2

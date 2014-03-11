@@ -50,7 +50,7 @@ static void led_io_cb(EV_P_ ev_io *w, int r)
 			work_release(tmp);
 		}
 	}
-	if (work->data.disk_id > PIC_LED_NUMBER) {
+	if (work->data.disk_id >= PIC_LED_NUMBER) {
 		fprintf(stderr, "disk_id %d invalid.\n", work->data.disk_id);
 		return;
 	}

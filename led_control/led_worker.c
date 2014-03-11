@@ -8,7 +8,8 @@
 extern struct list _g_led_list;
 static ev_timer worker_timer;
 extern struct ev_loop *led_loop;
-static int i;
+static int sts[PIC_LED_NUMBER];
+
 void work_release(led_work_t *work)
 {
 	list_del(&work->entry);
@@ -42,15 +43,16 @@ void led_on(led_work_args_t *data)
 		if (data->count > 0) {
 			data->count--;
 		} else if (data->count == 0) {
-			if (pic_read_disk(data->disk_id, &i) != 0) {
+/*			if (pic_read_disk(data->disk_id, &sts[data->disk_id]) != 0) {
 				 fprintf(stderr, "read disk %d failed.\n", 
 				 data->disk_id); 
-			}
-			if (pic_write_disk(data->disk_id, ~i) != 0) {
+			} */
+			if (pic_write_disk(data->disk_id, sts[data->disk_id]) != 0) {
 				 fprintf(stderr, "write disk %d failed.\n",
 				 data->disk_id); 
 			}
-			
+			sts[data->disk_id] = (sts[data->disk_id] + 1) % 2;
+
 			if (data->freq == FREQ_FAST) {
 				data->count = COUNT_FAST;
 			} else if (data->freq == FREQ_NORMAL) {
@@ -74,7 +76,6 @@ static void do_work(EV_P_ ev_timer *w, int r)
 	led_work_t *work;
 
 	if (list_empty(&_g_led_list)) {
-		printf("list empyt\n");
 		return ;
 	}
 	list_iterate_safe(n, nt, &_g_led_list) {
