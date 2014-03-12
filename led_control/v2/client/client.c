@@ -29,9 +29,9 @@ void print_help(void)
 {
 	printf("tools-test-led-no-mcu:\n");
 	printf("\t[--sysled|-s on|off\n");
-	printf("\t[--diskled|-d on|off|[blink--freq fast|normal|slow]] [--id|-i <disk_id>|<all>]\n");
+	printf("\t[--diskled|-d on|off|[blink --freq fast|normal|slow]] [--id|-i <disk_id>|<all>]\n");
 	printf("\t[--expire <seconds>]\n");
-	printf("\t[--table|-t]\n");
+	printf("\t[--help|-h]\n");
 }
 int my_getopt(int argc, char **argv)
 {
@@ -157,8 +157,11 @@ int main(int argc, char *argv[])
 		printf("magic check failed.\n");
 		return -1;
 	}
+	
 	printf("disk_num:%d\n", addr->disk_num);
-	if (disk_id > addr->disk_num) {
+	if ( disk_id > addr->disk_num ||
+	     ((disk_id < 0) && (disk_id != DISK_ID_NONE) && (disk_id != DISK_ID_ALL))
+		) {
 		printf("disk id invalid.\n");
 		return -1;
 	}
@@ -166,6 +169,7 @@ int main(int argc, char *argv[])
 	/*系统灯*/
 	taskp = (led_task_t *)((shm_head_t *)addr + 1);
 	if (flags) {
+		printf("done\n");
 		taskp->mode = systask.mode;
 		taskp->time = TIME_FOREVER;
 		taskp->freq = FREQ_NONE;
@@ -182,7 +186,7 @@ int main(int argc, char *argv[])
 			taskp->count = task.count;
 			taskp++;
 		}
-	} else {
+	} else if (disk_id != DISK_ID_NONE){
 		taskp = taskp + disk_id - 1;
 		taskp->mode = task.mode;
 		taskp->time = task.time;

@@ -35,8 +35,8 @@ struct led_task {
 };
 typedef struct shm_head shm_head_t;
 struct shm_head {
-	char version[10];
-	int magic;
+	char version[8];
+	unsigned int magic;
 	int disk_num;
 };
 #endif // COMMON__H__
