@@ -32,7 +32,7 @@ uint64_t get_fs_space(char *path)
 
 	if (statfs(path, &fsbuf) < 0) {
 		fprintf(stderr, "Can't get %s's statfs : %s\n", path,
-			strerror(errno));
+				strerror(errno));
 		return -1;
 	}
 	return (uint64_t) fsbuf.f_bavail * fsbuf.f_bsize;
@@ -45,7 +45,7 @@ float get_fs_stat(char *path)
 
 	if (statfs(path, &fsbuf) < 0) {
 		fprintf(stderr, "Can't get %s's statfs: %s\n", path,
-			strerror(errno));
+				strerror(errno));
 		return -1;
 	}
 
@@ -64,7 +64,7 @@ struct dirsname * get_fs_dirs_by_percent(struct dirsname *dirsp, int thread_n, l
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
 		if ((j = get_fs_stat(path)) > i &&
-		    get_fs_space(path) > (uint64_t) thread_n * file_size) {
+				get_fs_space(path) > (uint64_t) thread_n * file_size) {
 			i = j;
 			result = tmp;
 		}
@@ -84,7 +84,7 @@ struct dirsname * get_fs_dirs_by_size(struct dirsname *dirsp, int thread_n, long
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
 		if ((j = get_fs_space(path)) > i
-		    && get_fs_space(path) > (uint64_t) thread_n * file_size) {
+				&& get_fs_space(path) > (uint64_t) thread_n * file_size) {
 			i = j;
 			result = tmp;
 		}
@@ -105,7 +105,7 @@ struct dirsname * get_fs_dirs_by_weight(struct dirsname *dirsp, int thread_n, lo
 	while (tmp != dirsp) {
 		sprintf(path, "%s/%s", root_dir, tmp->name);
 		if (tmp->weight < i
-		    && get_fs_space(path) > (uint64_t) thread_n * file_size) {
+				&& get_fs_space(path) > (uint64_t) thread_n * file_size) {
 			i = tmp->weight;
 			result = tmp;
 		}
@@ -116,7 +116,7 @@ struct dirsname * get_fs_dirs_by_weight(struct dirsname *dirsp, int thread_n, lo
 
 /*默认的写策略，如果文件系统的可用空间大于80%且足够多线程同时写则返回，否则返回下一个*/
 struct dirsname * get_fs_dirs_default(struct dirsname *dirsp, struct dirsname *tmp_bef,
-				      int thread_n, long file_size)
+		int thread_n, long file_size)
 {
 	char path[300];
 	struct dirsname *tmp;
@@ -142,64 +142,79 @@ int _dfile(char *path)
 	int n = 0;
 	DIR *dirp;
 	struct dirent *dp;
-	struct stat statbuf;
+	struct stat statbuf, statbuf1;
 	char datebuf[300];
 	char hourbuf[200];
 	char thefile[300];
 	time_t nowtime;
 	char cmd[400];
-	char tmp[100] = "9999999999";
+	char tmp[300];
 
 	/*找到最早的date目录 */
-	sprintf(datebuf, "%s/", path);
-	//strcpy(tmp,"999999999\0");
 	if (!(dirp = opendir(path))) {
 		fprintf(stderr, "Can't open the dir %s: %s\n", path,
-			strerror(errno));
+				strerror(errno));
 		closedir(dirp);
 		return -1;
 	}
+	time(&nowtime);
 	while ((dp = readdir(dirp))) {
-		if (dp->d_type == DT_DIR) {
-			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
-				if (strcmp(dp->d_name, tmp) < 0) {
-					strcpy(tmp, dp->d_name);
+		if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
+			sprintf(tmp, "%s/%s", path, dp->d_name);
+			if (stat(tmp, &statbuf1) < 0) {
+				fprintf(stderr, "stderr, Can't stat the dier %s:%s\n",
+						tmp, strerror(errno));
+				return -1;
+			}
+			if (S_ISDIR(statbuf1.st_mode)) {
+				if (statbuf1.st_ctime < nowtime) {
+					nowtime = statbuf.st_ctime;
+					strcpy(datebuf, tmp);
 				}
+			} else {
+#ifdef DEBUG				
+				fprintf(stderr, "%s is not a dir\n", tmp);
+#endif
+				continue;
 			}
 		}
 	}
-	strcat(datebuf, tmp);
 #ifdef DEBUG
 	printf("find date file : %s\n", datebuf);
 #endif	
-	
+
 	/*找到最早的hour目录 */
 	time(&nowtime);
 	if ((dirp = opendir(datebuf)) < 0) {
 		fprintf(stderr, "Can't open dir %s: %s\n", datebuf,
-			strerror(errno));
+				strerror(errno));
 		return -1;
 	}
 	while ((dp = readdir(dirp)) != NULL) {
 		/*找到date目录下的hour目录 */
-		if (dp->d_type == DT_DIR) {
-			if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
-				n++;
-				sprintf(hourbuf, "%s/%s", datebuf, dp->d_name);
-				/*得到目录的创建时间 */
-				if (stat(hourbuf, &statbuf) < 0) {
-					fprintf(stderr,
+		if (strcmp(dp->d_name, ".") && strcmp(dp->d_name, "..")) {
+			n++;
+			sprintf(hourbuf, "%s/%s", datebuf, dp->d_name);
+			/*得到目录的创建时间 */
+			if (stat(hourbuf, &statbuf) < 0) {
+				fprintf(stderr,
 						"Can't stat the dir %s: %s\n",
 						hourbuf, strerror(errno));
-					return -1;
-				}
-				/*选择最早的目录 */
+				return -1;
+			}
+			/*选择最早的目录 */
+			if (S_ISDIR(statbuf.st_mode)) {
 				if (statbuf.st_ctime < nowtime) {
 					nowtime = statbuf.st_ctime;
 					strcpy(thefile, hourbuf);
 				}
-
+			} else {
+#ifdef DEBUG					
+				fprintf(stderr, "%s is not a dir\n", hourbuf);
+#endif
+				continue;
 			}
+
 		}
 	}
 	/* 删除最早的hour目录*/
@@ -208,7 +223,7 @@ int _dfile(char *path)
 
 		if (system(cmd) < 0) {
 			fprintf(stderr, "Can't delete the file %s: %s\n",
-				thefile, strerror(errno));
+					thefile, strerror(errno));
 			return -1;
 		} else {
 #ifdef DEBUG
@@ -217,12 +232,12 @@ int _dfile(char *path)
 			n--;
 		}
 	}
-/*删除空date目录 */
+	/*删除空date目录 */
 	if (n == 0) {
 		sprintf(cmd, "rm -rf %s", datebuf);
 		if (system(cmd) < 0) {
 			fprintf(stderr, "_dfile can't delete %s: %s\n", datebuf,
-				strerror(errno));
+					strerror(errno));
 			return -1;
 		}
 #ifdef DEBUG
@@ -241,7 +256,7 @@ int release_percent(char *path)
 			if (_dfile(path) < 0) {
 				openlog("fs_write", LOG_CONS | LOG_PID, 0);
 				syslog(LOG_USER | LOG_ERR, "_dfile %s error!\n",
-				       path);
+						path);
 				fprintf(stderr, "dfile %s error!\n", path);
 				return -1;
 			}
@@ -293,15 +308,14 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n, pthread_t * pi
 				if (get_fs_stat(path) <= START_RELEASE) {
 					strcpy(paths[i], path);
 					if (start_d_thread(paths[i], flag + i) <
-					    0) {
+							0) {
 						fprintf(stderr,
-							"create delete thread error!\n");
+								"create delete thread error!\n");
 						return -1;
 					}
 #ifdef DEBUG
-					printf
-						("delete thread %d  into %s to delete tid:%u!\n",
-						 i, path, (unsigned) *(flag + i));
+					printf("delete thread %d  into %s to delete tid:%u!\n",
+							i, path, (unsigned) *(flag + i));
 #endif
 					i++;
 				}
@@ -311,7 +325,7 @@ int moniter(struct dirsname *dirsp, long file_size, int thread_n, pthread_t * pi
 				pthread_join(*(flag + j), NULL);
 #ifdef DEBUG
 				printf("delete thread %d returned tid:%u!\n", j,
-				       (unsigned) *(flag + j));
+						(unsigned) *(flag + j));
 #endif
 			}
 #ifdef DEBUG
