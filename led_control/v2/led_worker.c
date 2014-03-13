@@ -25,8 +25,12 @@ static void timer_cb(EV_P_ ev_timer *w, int r)
 	/* 检查系统灯 */
 	if (systaskp->mode & MODE_ON) {
 		//TODO点亮系统灯
+		sb_gpio28_set(1);
+		printf("sysled on\n");
 	} else if (systaskp->mode & MODE_OFF) {
 		//TODO熄灭系统灯
+		sb_gpio28_set(0);
+		printf("sysled off\n");
 	}
 
 	for (i=0; i < disk_max_num; i++) {
@@ -60,9 +64,8 @@ static void timer_cb(EV_P_ ev_timer *w, int r)
 				fprintf(stderr, "disk %d freq not set.", i);
 				continue;
 			} 
-			if (taskp->count > 0) {
-				taskp->count--;
-			} else if (taskp->count == 0) {
+			
+			 if (taskp->count == 0) {
 				if (pic_write_disk_gen(i, sts[i+1]) != 0) {
 					fprintf(stderr, "blink disk %d failed.", i);
 				} else 
@@ -76,6 +79,8 @@ static void timer_cb(EV_P_ ev_timer *w, int r)
 					taskp->count = COUNT_SLOW;
 				}
 			}
+			 if (taskp->count > 0) 
+				 taskp->count--;
 		}
 		if (taskp->time != TIME_FOREVER)
 			taskp->time = taskp->time - WORKER_TIMER*1000;

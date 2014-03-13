@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 		case 't':
 			if (!strcmp(optarg, "3U")){
 				disk_max_num = SHMSIZE;
-				pic_write_disk_gen = pic_write_disk;
+				pic_write_disk_gen = pic_write_disk_3U;
 			} else if (!strcmp(optarg, "2U")) {
 				disk_max_num = 8;
 				pic_write_disk_gen = pic_write_disk_2U;
