@@ -1,15 +1,17 @@
 CROSS_COMPILE =
 
-lib-objs := pic_ctl.o
+lib-objs := pic_ctl.o libled.o
 
 -include config.mk
 
-all: libpic.a 
+all: libpic.a
 
-
-libpic.a: $(call to-progs,$(lib-objs))
+libpic.a: $(call to-progs,$(lib-objs)) libled.a
 	$(QUIET_AR)
 
+libled.a:
+	gcc -c libled.c
+	ar -rcs libled.a
 
 $(OBJS) : %.o : %.c
 	$(QUIET_CC)

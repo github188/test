@@ -7,6 +7,8 @@
 #include <errno.h>
 
 #include "../common.h"
+#include "../pic_ctl/pic_ctl.h"
+
 
 char *l_opt_arg;
 char *const short_options = "i:s:d:h";
@@ -27,12 +29,13 @@ struct option long_options[] = {
 
 void print_help(void)
 {
-	printf("tools-test-led-no-mcu:\n");
+	printf("tools-test-led:\n");
 	printf("\t[--sysled|-s on|off\n");
 	printf("\t[--diskled|-d on|off|[blink --freq fast|normal|slow]] [--id|-i <disk_id>|<all>]\n");
 	printf("\t[--expire <seconds>]\n");
 	printf("\t[--help|-h]\n");
 }
+
 int my_getopt(int argc, char **argv)
 {
 	int c;
@@ -102,6 +105,7 @@ int my_getopt(int argc, char **argv)
 	}
 	return 0;
 }
+
 int parse_args(void)
 {
 	if (task.mode != MODE_NONE && disk_id == DISK_ID_NONE) {
@@ -121,11 +125,102 @@ int parse_args(void)
 	return 0;
 	
 }
+
+int _do_3U_sigle(int disk_id)
+{
+	int freq;
+
+	if (task.mode & MODE_ON){
+		if (pic_set_led(disk_id-1, PIC_LED_ON, 0) < 0) {
+			fprintf(stderr, "set led %d on failed.\n", disk_id);
+			return -1;
+		} 
+	} else if (task.mode & MODE_OFF) {
+		if (pic_set_led(disk_id-1, PIC_LED_OFF, 0) < 0) {
+			fprintf(stderr, "set led %d off failed.\n", disk_id);
+			return -1;
+		}
+	} else if (task.mode & MODE_BLINK) {
+		if (task.freq & FREQ_FAST)
+			freq = PIC_LED_FREQ_FAST;
+		else if (task.freq & FREQ_NORMAL)
+			freq = PIC_LED_FREQ_NORMAL;
+		else if (task.freq & FREQ_SLOW)
+			freq = PIC_LED_FREQ_SLOW;
+
+		if (pic_set_led(disk_id-1, PIC_LED_BLINK, freq) < 0) {
+			fprintf(stderr, "set led %d blink failed.\n", disk_id);
+			return -1;
+		}
+ 	}
+	return 0;
+}
+
+/* 判断是否是所有灯 */
+int _do_3U(void)
+{
+	int i;
+	if (disk_id == DISK_ID_ALL) {
+		for (i = 1; i <= DISK_NUM_3U; i++) {
+			if (_do_3U_sigle(i) < 0) {
+				return -1;
+			}
+		}
+	} else {
+		if (_do_3U_sigle(disk_id) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+/* 调试完后关闭灯 */
+int _do_3U_stop(void)
+{
+	int i;
+	if (systask.mode & MODE_ON) {
+		sb_gpio28_set(0);
+	}
+	if (disk_id == DISK_ID_ALL) {
+		for (i = 1; i <= DISK_NUM_3U; i++){
+			pic_set_led(i-1, PIC_LED_OFF, 0);
+		}
+		return 0;
+	} else
+		return pic_set_led(disk_id-1, PIC_LED_OFF, 0);
+	       
+}
+
+
+
+int do_3U(void)
+{
+	/* 处理系统灯 */
+	if (systask.mode & MODE_ON) {
+		sb_gpio28_set(1);
+	} else if (systask.mode & MODE_OFF) {
+		sb_gpio28_set(0);
+	}
+	/* 处理时间 */
+	if (task.time != TIME_FOREVER) {
+		if (_do_3U() < 0) {
+			return -1;
+		} 
+		sleep(task.time);
+		_do_3U_stop();
+	} else {
+		if (_do_3U() < 0)
+			return -1;
+	}
+	return 0;
+	
+}
+
 int main(int argc, char *argv[])
 {
 	int shmid;
 	key_t shmkey;
-	shm_head_t *addr;
+	shm_t *addr;
+	shm_head_t *head;
 	led_task_t *taskp;
 	
 	if (argc < 3) {
@@ -148,18 +243,25 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	addr = (shm_head_t *)shmat(shmid, 0, 0);
-	if (addr == (shm_head_t *)-1) {
+	addr = (shm_t *)shmat(shmid, 0, 0);
+	if (addr == (shm_t *)-1) {
 		printf("shmat failed.\n");
 		return -1;
 	}
-	if (addr->magic != MAGIC) {
+	if (addr->sys & SYS_3U) {
+		if (do_3U() < 0) {
+			return -1;
+		}
+		return 0;
+	}
+
+	head = &addr->shm_head;
+	if (head->magic != MAGIC) {
 		printf("magic check failed.\n");
 		return -1;
 	}
 	
-	printf("disk_num:%d\n", addr->disk_num);
-	if ( disk_id > addr->disk_num ||
+	if ( disk_id > head->disk_num ||
 	     ((disk_id < 0) && (disk_id != DISK_ID_NONE) && (disk_id != DISK_ID_ALL))
 		) {
 		printf("disk id invalid.\n");
@@ -167,27 +269,25 @@ int main(int argc, char *argv[])
 	}
 	
 	/*系统灯*/
-	taskp = (led_task_t *)((shm_head_t *)addr + 1);
+	taskp = &addr->task[0];
 	if (flags) {
-		printf("done\n");
 		taskp->mode = systask.mode;
 		taskp->time = TIME_FOREVER;
 		taskp->freq = FREQ_NONE;
 		taskp->count = 0;
 	}
 	
-	taskp++;
 	if (disk_id == DISK_ID_ALL){
 		int i;
-		for (i=1; i <= addr->disk_num; i++){
+		for (i=1; i <= head->disk_num; i++){
+			taskp = &addr->task[i];
 			taskp->mode = task.mode;
 			taskp->time = task.time;
 			taskp->freq = task.freq;
 			taskp->count = task.count;
-			taskp++;
 		}
 	} else if (disk_id != DISK_ID_NONE){
-		taskp = taskp + disk_id - 1;
+		taskp = &addr->task[disk_id];
 		taskp->mode = task.mode;
 		taskp->time = task.time;
 		taskp->freq = task.freq;

@@ -1,8 +1,16 @@
 #ifndef COMMON__H__
 #define COMMON__H__
 
-#define SHMKEY		"led_control"
-#define SHMSIZE		16
+#define SHMKEY		"/usr/local/bin"
+
+#define DISK_NUM_NONE	0
+#define DISK_NUM_3U	16
+#define DISK_NUM_2U	8
+
+#define SYS_NONE	0
+#define SYS_3U		1
+#define SYS_2U		2
+#define SYS_S3U		4
 
 #define DISK_ID_NONE	-1
 #define DISK_ID_ALL	-2
@@ -33,10 +41,18 @@ struct led_task {
 	int freq;
 	int count;
 };
+
 typedef struct shm_head shm_head_t;
 struct shm_head {
 	char version[8];
 	unsigned int magic;
 	int disk_num;
+};
+
+typedef struct shm_struct shm_t;
+struct shm_struct {
+	int sys;
+	shm_head_t shm_head;
+	led_task_t task[0];
 };
 #endif // COMMON__H__

@@ -7,34 +7,30 @@
 
 extern int disk_max_num;
 
-extern shm_head_t *addr;
+extern shm_t *addr;
 extern int (*pic_write_disk_gen)(int, int);
 static ev_timer worker_timer;
 static struct ev_loop *led_loop = NULL;
-static int sts[SHMSIZE + 1];
+static int sts[DISK_NUM_3U + 1];
 
 static void timer_cb(EV_P_ ev_timer *w, int r)
 {
 	led_task_t *taskp = NULL;
-	led_task_t *systaskp = NULL;
 	int i;
 
 	/* 跳过shm的头部 */
-	systaskp = (led_task_t *)((shm_head_t *)addr + 1);
-
+	taskp = &addr->task[0];
+	
 	/* 检查系统灯 */
-	if (systaskp->mode & MODE_ON) {
+	if (taskp->mode & MODE_ON) {
 		//TODO点亮系统灯
 		sb_gpio28_set(1);
-		printf("sysled on\n");
-	} else if (systaskp->mode & MODE_OFF) {
+	} else if (taskp->mode & MODE_OFF) {
 		//TODO熄灭系统灯
 		sb_gpio28_set(0);
-		printf("sysled off\n");
 	}
-
 	for (i=0; i < disk_max_num; i++) {
-		taskp = systaskp + i + 1;
+		taskp = &addr->task[i+1];
 		if (taskp == NULL) {
 			fprintf(stderr, "taskp is null\n");
 			continue;
@@ -43,33 +39,27 @@ static void timer_cb(EV_P_ ev_timer *w, int r)
 			fprintf(stderr, "mode not set.\n");
 			continue;
 		}
-
 		if (taskp->time <= 0 && taskp->time != TIME_FOREVER) {
 			taskp->mode = MODE_NONE;
 			continue;
 		}
-		
 		if (taskp->mode & MODE_ON) {
-			if (pic_write_disk_gen(i, PIC_LED_ON) != 0) {
-				fprintf(stderr, "led on disk %d failed.", i);
-			} else 
-				printf("led on done\n");
+			if (pic_write_disk_gen(i, PIC_LED_ON_S) != 0) {
+				fprintf(stderr, "led on disk %d failed.\n", i);
+			}
 		} else if (taskp->mode & MODE_OFF) {
-			if (pic_write_disk_gen(i, PIC_LED_OFF) != 0) {
-				fprintf(stderr, "led off disk %d failed.", i);
-			} else 
-				printf("led off done\n");
+			if (pic_write_disk_gen(i, PIC_LED_OFF_S) != 0) {
+				fprintf(stderr, "led off disk %d failed.\n", i);
+			} 
 		} else if (taskp->mode & MODE_BLINK) {
 			if (taskp->freq == FREQ_NONE) {
-				fprintf(stderr, "disk %d freq not set.", i);
+				fprintf(stderr, "disk %d freq not set.\n", i);
 				continue;
 			} 
-			
 			 if (taskp->count == 0) {
 				if (pic_write_disk_gen(i, sts[i+1]) != 0) {
-					fprintf(stderr, "blink disk %d failed.", i);
-				} else 
-					printf("led blink done!\n");
+					fprintf(stderr, "blink disk %d failed.\n", i);
+				}
 				sts[i+1] = (sts[i+1] + 1) % 2;
 				if (taskp->freq  & FREQ_FAST) {
 					taskp->count = COUNT_FAST;
@@ -86,7 +76,7 @@ static void timer_cb(EV_P_ ev_timer *w, int r)
 			taskp->time = taskp->time - WORKER_TIMER*1000;
 		if (taskp->time <= 0 && taskp->time != TIME_FOREVER) {
 			taskp->mode = MODE_NONE;
-			pic_write_disk_gen(i, PIC_LED_OFF);
+			pic_write_disk_gen(i, PIC_LED_OFF_S);
 		}
 	}
 }

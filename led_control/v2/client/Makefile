@@ -1,8 +1,10 @@
-OBJECTS := client.o
+OBJECTS := tools-test-led.o
+LIBS := -L../pic_ctl -lpic
+all: tools-test-led
 
-client: $(OBJECTS)
-	gcc -o client $(OBJECTS)
+tools-test-led:$(OBJECTS)
+	gcc -o tools-test-led $(OBJECTS) $(LIBS)
 clean:
-	rm -rf *.o client
+	rm -rf *.o tools-test-led
 
 

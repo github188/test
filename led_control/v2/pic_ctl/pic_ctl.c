@@ -3,12 +3,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
 #include "i2c-dev.h"
 #include "pic_ctl.h"
 
 #define I2C_DEV "/dev/i2c-0"
+
+
 
 #define PIC_CHECK_INIT_2U()	do {		\
 		int ret = pic_init_2U();	\
@@ -31,6 +32,122 @@
 static int pic_is_initialized;
 static int pic_fd;
 
+static int __pic_read_reg(uint8_t reg, uint8_t *v)
+{
+	int ret;
+
+	ret = i2c_smbus_read_byte_data(pic_fd, reg);
+	if (ret == -1)
+		return PERR_IOERR;
+	*v = ret;
+	return 0;
+}
+
+static int __pic_write_reg(uint8_t reg, uint8_t v)
+{
+	int ret;
+
+	ret = i2c_smbus_write_byte_data(pic_fd, reg, v);
+	if (ret < 0)
+		return PERR_IOERR;
+	return 0;
+}
+
+int pic_init(void)
+{
+	int fd;
+
+	if (pic_is_initialized)
+		return 0;
+	fd = open(I2C_DEV, O_RDWR);
+	if (fd < 0)
+		return PERR_NODEV;
+	if (ioctl(fd, I2C_SLAVE_FORCE, PIC_ADDRESS) < 0) {
+		close(fd);
+		return PERR_NODEV;
+	}
+
+	pic_is_initialized = 1;
+	pic_fd = fd;
+
+	return 0;
+}
+
+void pic_release(void)
+{
+	if (pic_is_initialized) {
+		close(pic_fd);
+		pic_is_initialized = 0;
+	}
+}
+
+#define PIC_CHECK_INIT()	do {		\
+	int ret = pic_init();			\
+	if (ret < 0)				\
+		return ret;			\
+} while (0)
+
+int pic_get_version(uint32_t *version)
+{
+	uint8_t vl, vh;
+	int ret;
+
+	PIC_CHECK_INIT();
+	ret = __pic_read_reg(PIC_VERH, &vh);
+	if (ret < 0)
+		return ret;
+	ret = __pic_read_reg(PIC_VERL, &vl);
+	if (ret < 0)
+		return ret;
+
+	*version = (vh << 8) | vl;
+
+	return 0;
+}
+
+int pic_set_led(uint8_t led, uint8_t sts, uint8_t freq)
+{
+	uint8_t v;
+	uint8_t reg;
+
+	PIC_CHECK_INIT();
+	if (led >= PIC_LED_NUMBER)
+		return PERR_INVAL;
+	reg = PIC_LED_START + led;
+	v = (freq << PIC_LED_FREQ_SHIFT) | (sts & PIC_LED_STS_MASK);
+
+	return __pic_write_reg(reg, v);
+}
+
+int pic_start_watchdog(void)
+{
+	PIC_CHECK_INIT();
+	return __pic_write_reg(PIC_WDT, PIC_WDT_START);
+}
+
+int pic_stop_watchdog(void)
+{
+	PIC_CHECK_INIT();
+	return __pic_write_reg(PIC_WDT, PIC_WDT_STOP);
+}
+
+int pic_reset_timer(int sec)
+{
+	PIC_CHECK_INIT();
+	return __pic_write_reg(PIC_HDD_RESET_TIMER, sec * HZ);
+}
+int pic_reset_hd(int idx)
+{
+	PIC_CHECK_INIT();
+	return __pic_write_reg(PIC_HDD_RESET_START + idx, 1);
+}
+int pic_clear_reset_hd(int idx)
+{
+	PIC_CHECK_INIT();
+	return __pic_write_reg(PIC_HDD_RESET_CLR_START + idx, 1);
+}
+
+/* 简易3U */
 int pic_read_disk_3U(int disk_id, int *v)
 {
 	//TODO
@@ -46,6 +163,7 @@ int pic_init_3U(void)
 	//TODO
 }
 
+/* 2U */
 int pic_read_disk_2U(int disk_id, int *v)
 {
 	int ret;
@@ -158,14 +276,14 @@ int pic_init_2U(void)
 	if (value == -1)
 		return PERR_IOERR;
 	value &= 0xf0;
-	ret = i2c_smbus_write_byte_data(fd, value, PIC_GP1_MODE2);
+	ret = i2c_smbus_write_byte_data(fd, PIC_GP1_MODE2, value);
 	if (ret == -1)
 		return PERR_IOERR;
 	value = i2c_smbus_read_byte_data(fd, PIC_GP2_MODE2);
 	if (value == -1)
 		return PERR_IOERR;
 	value &= 0xf0;
-	ret = i2c_smbus_write_byte_data(fd, value, PIC_GP2_MODE2);
+	ret = i2c_smbus_write_byte_data(fd, PIC_GP2_MODE2, value);
 	if (ret == -1)
 		return PERR_IOERR;
 
@@ -174,14 +292,7 @@ int pic_init_2U(void)
 	return 0;
 }
 
-void pic_release(void)
-{
-	if (pic_is_initialized) {
-		close(pic_fd);
-		pic_is_initialized = 0;
-	}
-}
-
+/* 系统灯 */
 #define GPIO_BASE_ADDR (0x500)
 
 #define GPIO_VALUE(fd, base, op, data)		\
@@ -218,52 +329,3 @@ int sb_gpio28_set(int sw)
 
 	return -1;
 }
-
-/*
-int main(int argc, char *argv[])
-{
-	int i;
-	int j;
-	
-	PIC_CHECK_INIT_2U();
-	for (i = 0; i  < 4; i++) {
-		j = i2c_smbus_read_byte_data(pic_fd, PIC_GP1_MODE);
-		if (j == -1) {
-			printf("read failed.\n");
-			return -1;
-		}
-		if (j == PIC_LED_ON) {
-			printf("led %d: on %d\n", i+1, j);
-		} else if (j == PIC_LED_OFF) {
-			printf("led %d: off %d\n ", i + 1, j);
-		}else {
-			printf("led %d : unkown %d\n", i + 1, j);
-		}
-			
-	}
-	for (i = 4; i < 8; i++) {
-		j = i2c_smbus_read_byte_data(pic_fd, PIC_GP2_MODE);
-		if (j == -1) {
-			printf("read failed.\n");
-			return -1;
-		}
-		if (j == PIC_LED_ON) {
-			printf("led %d: on %d\n", i+1, j);
-		} else if (j == PIC_LED_OFF) {
-			printf("led %d: off %d\n ", i + 1, j);
-		}else {
-			printf("led %d : unkown %d\n", i + 1, j);
-		
-		}
-	}
-
-	for (i = 0; i < 8; i++) {
-		pic_read_disk_2U(i, &j);
-		printf("%d : %d\n", i, j); 
-	}
-	for (i = 0; i < 4; i++) {
-		pic_write_disk_2U(i, PIC_LED_OFF);
-	}
-	return 0;
-}
-*/

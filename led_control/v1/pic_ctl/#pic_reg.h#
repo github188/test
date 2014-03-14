@@ -7,9 +7,6 @@ enum {
 
 enum {
 	PIC_ADDRESS	= 0x30,
-	PIC_ADDRESS_2U	= (0x30 >> 1),
-	PIC_ADDRESS_3U1 = (0x3c >> 1),
-	PIC_ADDRESS_3U2	= (0x3E >> 1),
 
 	PIC_VERH	= 0x00,
 	PIC_VERL	= 0x01,

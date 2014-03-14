@@ -7,7 +7,7 @@
 #include "led_shm.h"
 
 extern int disk_max_num;
-shm_head_t *addr;
+shm_t *addr;
 int shm_init()
 {
 	int shmid;
@@ -16,22 +16,33 @@ int shm_init()
 
 	
 	shmkey = ftok(SHMKEY, 0);
-	size = (sizeof(led_task_t) * (disk_max_num + 1) + sizeof(shm_head_t));
+	if (disk_max_num == DISK_NUM_NONE)
+		size = sizeof(shm_head_t) + sizeof(int);
+	else
+		size = (sizeof(led_task_t) * (disk_max_num + 1) + sizeof(shm_head_t) + sizeof(int));
 	shmid = shmget(shmkey, size,  0666|IPC_CREAT);
 	if (shmid == -1) {
 		fprintf(stderr, "create shm failed.\n");
 		return -1;
 	}
-	addr = (shm_head_t *)shmat(shmid, 0, 0);
-	if (addr == (shm_head_t*)-1) {
+	addr = (shm_t *)shmat(shmid, 0, 0);
+	if (addr == (shm_t*)-1) {
 		fprintf(stderr, "shmat failed.\n");
 		return -1;
 	}
-	strcpy(addr->version, VERSION);
-	addr->magic = MAGIC;
-	addr->disk_num = disk_max_num;
+	if (disk_max_num == DISK_NUM_NONE) {
+		addr->sys = SYS_3U;
+		return shmid;
+	}
+	if (disk_max_num == DISK_NUM_3U) {
+		addr->sys = SYS_S3U;
+	} else if (disk_max_num == DISK_NUM_2U){
+		addr->sys = SYS_2U;
+	}
+	strcpy(addr->shm_head.version, VERSION);
+	addr->shm_head.magic = MAGIC;
+	addr->shm_head.disk_num = disk_max_num;
 
-	printf("shmid : %d addr: %p\n", shmid, addr);
 
 	return shmid;
 }
