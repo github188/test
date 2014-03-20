@@ -143,12 +143,12 @@ int _dfile(char *path)
 	DIR *dirp;
 	struct dirent *dp;
 	struct stat statbuf, statbuf1;
-	char datebuf[300];
-	char hourbuf[200];
+	char datebuf[200];
+	char hourbuf[250];
 	char thefile[300];
 	time_t nowtime;
 	char cmd[400];
-	char tmp[300];
+	char tmp[200];
 
 	/*找到最早的date目录 */
 	if (!(dirp = opendir(path))) {
@@ -168,7 +168,7 @@ int _dfile(char *path)
 			}
 			if (S_ISDIR(statbuf1.st_mode)) {
 				if (statbuf1.st_ctime < nowtime) {
-					nowtime = statbuf.st_ctime;
+					nowtime = statbuf1.st_ctime;
 					strcpy(datebuf, tmp);
 				}
 			} else {
