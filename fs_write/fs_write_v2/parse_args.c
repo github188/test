@@ -39,18 +39,16 @@ void print_help(void)
 void print_usage(void)
 {
 	printf("fs_write, version 0.2\n");
-	printf("Usage: fs_write -d <root_dir> [[-s <file_size>] [-b <block_size>] [-n <thread_n>]\n");
-	printf("\t\t[-i <interval>] [-p <choose-policy>]]\n");
+	printf("Usage: fs_write -d <root_dir> [-s <file_size>] [-b <block_size>] [-n <thread_n>]\n");
+	printf("\t\t[-i <interval>] [-p <choose-policy>]\n");
 	printf("\t-d --dir	  :root_dir \tthe dir include mountpoints.\n\n");
 	printf("\t-s --file-size  :file_size \tthe filesize the unit is M default is 256M.\n");
 	printf("\t-b --block-size :block_size\tthe blocksize of the file to write,default is 1024.\n");
 	printf("\t-n --threadn    :thread_n    \tthe number of write thread, should be lower 32 default is 4.\n");
 	printf("\t-i --interval   :time_s      \tevery seconds change the mountpoints to write. \n");
-	printf("\t\t\t\t\tif time_s=0 the thread will choose fs to write after write one file.\n");
+	printf("\t\t\t\t\tif time_s=0 the thread will write one file system always and don't change.\n");
 	printf("\t-p --choose-policy:policy    \tthe policy used by write thread to choose file system.\n");
-	printf("\t\t\t\t\tit can be one of {weighting|free-size|free-percent}.\
-n");
-	printf("\n\n");
+	printf("\t\t\t\t\tit can be one of {weighting|free-size|free-percent}, default is weighting.\n");
 }
 
 /*检查目录是否挂载文件系统 返回0为挂载了*/
@@ -356,6 +354,9 @@ int my_getopt(int argc, char **argv)
 int
 parse_args(struct dirsname *dirsp, int argc, char *argv[], int *p)
 {
+	if (argc < 2) {
+		return -1;
+	}
 	if (my_getopt(argc, argv) < 0) {
 		return -1;
 	}

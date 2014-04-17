@@ -199,9 +199,7 @@ struct dirsname * choose_policy(struct dirsname *dirsp, struct dirsname *bef, in
 	struct dirsname *tmp = NULL;
 	switch (policy) {
 	case 0:
-		tmp = get_fs_dirs_default(dirsp, bef, thread_n, file_size);
-		break;
-	case 1:
+       	case 1:
 		tmp = get_fs_dirs_by_weight(dirsp, thread_n, file_size);
 		pthread_mutex_lock(&mutex);
 		tmp->weight++;
