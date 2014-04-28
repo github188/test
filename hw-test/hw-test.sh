@@ -8,21 +8,36 @@ help() {
 }
 
 dateinfo() {
+	local flag=0
 	echo -e "\t\tDATE"
 	echo -e "========================================="
-	echo -e "ntpdate..."
-	ntpservers="time-a.nist.gov time-a.timefreq.bldrdoc.gov time.nist.gov time-nw.nist.gov"
-	for ntpserver in ntpservers;
+	echo -e localtaime:`date`
+
+	while [[ "x"$ans != "xy" && "x"$ans != "xn" ]]
 	do
-		sudo ntpdate time-a.nist.gov > /dev/null 2>&1
-		if [ $? -ne 0 ];then
-			echo -e "ntpdate failed."
-		else 
-			echo -e "ntpdate success!"
-			break
-		fi
+		echo -en "Update the localtime:[y/n]"
+		read ans
 	done
-	echo  -e `date`
+	if [ "x"$ans == "xy" ];then
+		echo -e "ntpdate..."
+		#在ntpservers里面添加服务器地址
+		ntpservers="11.1.1.1 time-a.nist.gov time-a.timefreq.bldrdoc.gov time.nist.gov time-nw.nist.gov"
+		for ntpserver in $ntpservers;
+		do
+			sudo ntpdate $ntpserver > /dev/null 2>&1
+			if [ $? -ne 0 ];then
+				continue
+			else 
+				flag=1
+				echo -e "ntpdate success!"
+				break
+			fi
+		done
+		if [ $flag -eq 0 ];then
+			echo -e "ntpdate failed."
+		fi
+		echo  -e `date`
+	fi
 	echo -e "=========================================\n"
 }
 
@@ -76,31 +91,34 @@ network(){
 }
 
 disks(){
+	if [ -z $sysdisk ];then
+		sysdisk
+	fi
 	echo -e "\t\tDISKS:"
 	echo -e "=========================================="
 	disks=`ls -l /sys/block |grep -E ".*/host([0-9]+)/.*/block/sd[a-z]+"|grep -v $sysdisk|awk '{print $9}'`
 	disknum=`echo $disks | wc -w`
-	readfail=
-	writefail=
-	#echo -e "$disks"
+	readfail=''
+	writefail=''
 	echo -e "total: $disknum"
+	#echo -e "$disks"
 	for disk in $disks; do
-		dd if=/dev/zero of=/dev/$disk bs=512 count=1 >/dev/null 2>&1
+		dd if=/dev/zero of=/dev/$disk bs=511 count=1 >/dev/null 2>&1
 		if [ $? -ne 0 ];then
-			writefail=$writefail+' '+$disk
+			writefail=$writefail' '$disk
 		fi
 		dd if=/dev/$disk of=/dev/null bs=512 count=1 >/dev/null 2>&1
 		if [ $? -ne 0 ];then
-			readfail=$readfail+' '+$disk
+			readfail=$readfail' '$disk
 		fi
 	done
-	if [ -z $readfail -a -z $writefail ];then
+	if [[ -z $readfail && -z $writefail ]];then
 		echo -e "status: all good"
 	fi
-	if [ ! -z $readfail ]; then
-		echo -e "readfail: $readfaile"
+	if [ ! -z "$readfail" ]; then
+		echo -e "readfail: $readfail"
 	fi
-	if [ ! -z $writefail ]; then
+	if [ ! -z "$writefail" ]; then
 		echo -e "writefail: $writefail"
 	fi
 	echo -e "==========================================\n"
