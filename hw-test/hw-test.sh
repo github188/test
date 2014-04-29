@@ -11,13 +11,15 @@ dateinfo() {
 	local flag=0
 	echo -e "\t\tDATE"
 	echo -e "========================================="
-	echo -e localtaime:`date`
+	echo -e localtaime:`date +"%Y-%m-%d %H:%M:%S"`
 
-	while [[ "x"$ans != "xy" && "x"$ans != "xn" ]]
-	do
-		echo -en "Update the localtime:[y/n]"
-		read ans
-	done
+       # while [[ "x"$ans != "xy" && "x"$ans != "xn" ]]
+	#do
+		#echo -en "Update the localtime:[y/n]"
+		#read ans
+	#done
+	echo -en "Update the localtime:[y/n]"
+	read ans
 	if [ "x"$ans == "xy" ];then
 		echo -e "ntpdate..."
 		#在ntpservers里面添加服务器地址
@@ -36,7 +38,7 @@ dateinfo() {
 		if [ $flag -eq 0 ];then
 			echo -e "ntpdate failed."
 		fi
-		echo  -e `date`
+		echo  -e `date +"%Y-%m-%d %H:%M:%S"`
 	fi
 	echo -e "=========================================\n"
 }
