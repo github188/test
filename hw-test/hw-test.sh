@@ -1,9 +1,13 @@
 #!/bin/bash
 
+version()
+{
+	echo "hw-test - v0.1 - 20140430 12:00"
+}
+
 help() {
-	echo ""
 	echo "usage:"
-	echo "	hw-test [date][cpu][mem][sysdisk][network][disks]"
+	echo "	hw-test [date][cpu][mem][sysdisk][network][disks][version]"
 	echo ""
 }
 
@@ -162,6 +166,10 @@ do
 			;;
 		disks)
 			disks
+			shift
+			;;
+		version)
+			version
 			shift
 			;;
 		*)
