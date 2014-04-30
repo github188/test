@@ -109,11 +109,11 @@ disks(){
 	echo -e "total: $disknum"
 	#echo -e "$disks"
 	for disk in $disks; do
-		dd if=/dev/zero of=/dev/$disk bs=511 count=1 >/dev/null 2>&1
+		dd if=/dev/zero of=/dev/$disk bs=1024 count=1  oflag=direct >/dev/null 2>&1
 		if [ $? -ne 0 ];then
 			writefail=$writefail' '$disk
 		fi
-		dd if=/dev/$disk of=/dev/null bs=512 count=1 >/dev/null 2>&1
+		dd if=/dev/$disk of=/dev/null bs=1024 count=1 iflag=direct >/dev/null 2>&1
 		if [ $? -ne 0 ];then
 			readfail=$readfail' '$disk
 		fi
