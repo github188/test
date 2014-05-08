@@ -90,9 +90,17 @@ sysdisk(){
 network(){
 	echo -e "\t\tNETWORK"
 	echo -e "=========================================="
-	netcard=`sudo ls -l /sys/class/net|grep "devices"|grep -v "lo"|grep -v "total"|awk '{print $9}'`
-	echo -e "total: `echo $netcard | wc -w`"
-	#echo -e "$netcard"
+	netcards=`sudo ls -l /sys/class/net|grep "devices"|grep -v "lo"|grep -v "total"|awk '{print $9}'`
+	echo -e "total: `echo $netcards | wc -w`"
+	for netcard in $netcards; do
+		speed=`sudo cat /sys/class/net/$netcard/speed  2>/dev/null`
+		if [ x$speed == 'x' ]; then
+			speed=0
+		elif [[ $speed -gt 10000 ]]; then
+			speed=0
+		fi
+		echo -e "$netcard:\t$speed Mps"
+	done
 	echo -e "==========================================\n"
 }
 
