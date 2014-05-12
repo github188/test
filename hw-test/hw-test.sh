@@ -94,17 +94,15 @@ network(){
 	echo -e "total: `echo $netcards | wc -w`"
 	for netcard in $netcards; do
 		carrier=`sudo cat /sys/class/net/$netcard/carrier 2>/dev/null`
-		speed=`sudo cat /sys/class/net/$netcard/speed  2>/dev/null`
-		if [ $carrier -eq 1 ]; then
-			if [ x$speed == 'x' ]; then
-				speed=0
-			elif [[ $speed -gt 100000 ]]; then
+		if [ "$carrier" != "1" ]; then
+			speed=0
+		else
+			speed=`sudo cat /sys/class/net/$netcard/speed  2>/dev/null`
+			if [ "$speed" = "" ]; then
 				speed=0
 			fi
-			echo -e "$netcard:\t$speed Mps"
-		else
-			echo -e "$netcard:\t0 Mps"
 		fi
+		echo -e "$netcard:\t$speed Mbps"
 	done
 	echo -e "==========================================\n"
 }
