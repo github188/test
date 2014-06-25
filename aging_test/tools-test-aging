@@ -127,8 +127,8 @@ do
 	if [ ! -b /dev/$disk ]; then
 		return 1
 	fi						                
-	dd if=/dev/zero of=/dev/$disk bs=1M oflag=direct >/dev/null 2>&1
-	dd if=/dev/$disk of=/dev/null bs=1M iflag=direct >/dev/null 2>&1
+	dd if=/dev/zero of=/dev/$disk bs=1M >/dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M >/dev/null 2>&1
 	sleep 1   
 	##防止因为dd 发送数据到内核 引起的iostat显示数据过高
 done
@@ -139,20 +139,6 @@ EOF
 			echo "io_${disk}_errors=0" >> $ERROR_STATUS_FILE
 		fi
 	done
-	file=/tmp/.${PROG_NAME}_io_mem
-	cat << EOF >$file
-#!/bin/sh
-while true
-do
-	sync
-	echo 3>/proc/sys/vm/drop_caches
-	dd if=/dev/zero of=$IO_MEM bs=1M count=8096 >/dev/null 2>&1
-	dd if=$IO_MEM of=/dev/zero bs=1M count=8096 >/dev/null 2>&1
-	sleep 180
-done
-EOF
-	chmod +x $file
-	$file &
 }
 
 test_net()
@@ -304,7 +290,6 @@ stop()
 	else
 		echo "$PROG_NAME 没有运行！"
 	fi
-	rm -f $IO_MEM
 	rm -f $RUN_STATUS_FILE
 }
 
@@ -449,7 +434,6 @@ PART=""
 SYS_DISK=""
 ERROR_STATUS_FILE="/var/log/aging-test-status"
 REBOOTTIMES=0
-IO_MEM="/home/tools-test-aging-io-men"
 if [ ! -z "$1" ]; then
 	if [ "$1" = "--stop" ]; then
 		stop
