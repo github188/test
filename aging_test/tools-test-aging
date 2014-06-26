@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$PROG_NAME - v1.4 - 20131105 14:01"
+	echo "$PROG_NAME - v1.5 - 20140626 12:26"
 }
 
 usage()
@@ -139,6 +139,34 @@ EOF
 			echo "io_${disk}_errors=0" >> $ERROR_STATUS_FILE
 		fi
 	done
+	file=/tmp/.${PROG_NAME}_io_mem
+	cat << EOF >$file
+#!/bin/bash
+sleep 10
+
+if mount -l | grep -q " $IO_MEM_DIR "; then
+	umount $IO_MEM_DIR
+fi
+rm -rf $IO_MEM_DIR
+
+free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
+let free_mem-=100
+if [ \$free_mem -lt 100 ]; then
+	exit 0
+fi
+
+mkdir $IO_MEM_DIR
+mount -t tmpfs -o size=\${free_mem}m tmpfs $IO_MEM_DIR
+
+while true
+do
+	dd if=/dev/zero of=$IO_MEM_DIR/file bs=1M >/dev/null 2>&1
+	dd if=$IO_MEM_DIR/file of=/dev/null bs=1M >/dev/null 2>&1
+	sleep 3
+done
+EOF
+	chmod +x $file
+	$file &
 }
 
 test_net()
@@ -290,6 +318,11 @@ stop()
 	else
 		echo "$PROG_NAME 没有运行！"
 	fi
+	
+	if mount -l | grep -q " $IO_MEM_DIR "; then
+		umount $IO_MEM_DIR
+	fi
+	rm -rf $IO_MEM_DIR
 	rm -f $RUN_STATUS_FILE
 }
 
@@ -434,6 +467,7 @@ PART=""
 SYS_DISK=""
 ERROR_STATUS_FILE="/var/log/aging-test-status"
 REBOOTTIMES=0
+IO_MEM_DIR="/tmp/mem"
 if [ ! -z "$1" ]; then
 	if [ "$1" = "--stop" ]; then
 		stop
