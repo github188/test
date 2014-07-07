@@ -1,0 +1,990 @@
+###############################################################################
+# Author : liyunteng
+# Email : li_yunteng@163.com
+# Created Time : 2014-07-01 17:49
+# Filename : jw-aging.sh
+# Description : 
+###############################################################################
+#!/bin/bash
+export PS3="Enter your choice: "
+Version=`system --get-info|grep value|sed -n 4p|awk -F : '{print $2":"$3":"$4":"$5}'`
+Date=`date +"%Y/%m/%d %H:%M:%S"`
+Hostname=`hostname`
+Manager_version=`echo $Version|awk -F : '{print $1}'|tr -d "\""`
+Kernel_version=`echo $Version|awk -F : '{print $2}'`
+Pic_version=`echo $Version|awk -F : '{print $3}'`
+Web_version=`echo $Version|awk -F : '{print $4}' |awk '{print $1}'`
+Hwtype=`hwtype`
+iperf_tmp="/tmp/iperf"
+dd_tmp="/tmp/dd"
+net_speed_limit=100
+IO_MEM_DIR="/mnt/tmpfs"
+ERROR_STATUS_FILE="/var/log/jw-aging"
+Product_num=`dmidecode -s baseboard-product-name`
+case $Product_num in
+	"1001")
+		Product_name="SYS-6026B-T(2U-B75)"
+		Eth_num=2
+		Disk_num=8
+		;;
+	"1002")
+		Product_name="SYS-6026N-T(2U-ATOM)"
+		Eth_num=2
+		Disk_num=8
+		;;
+	"1003")
+		Product_name="SYS-6036B-T(3U-SIMPLE)"
+		Eth_num=2
+		Disk_num=16
+		;;
+	"1004")
+		Product_name="SYS-6036C-T(3U-C216)"
+		Eth_num=5
+		Disk_num=16
+		;;
+	"1005")
+		Product_name="SYS-6036Z-T(3U-Z77)"
+		Eth_num=2
+		Disk_num=16
+		;;
+	*)
+		Product_name="Unknown"
+		Eth_num=0
+		Disk_num=0
+		;;
+esac
+		
+mem_info=`dmidecode -t memory`
+mem_manufacturer=(`echo "$mem_info"|grep Manufacturer|awk -F : '{print $2}'`)
+mem_type=(`echo "$mem_info"|grep Type|grep -v "Type Detail"| grep -v "Error Correction Type"|awk -F : '{print $2}'`)
+mem_speed=(`echo "$mem_info"|grep Speed|grep -v "Configured Clock Speed"|awk -F : '{print $2}'|awk '{print $1}'`)
+mem_size=(`echo "$mem_info"|grep Size|awk -F : '{print $2}'|awk '{print $1}'`)
+mem_locator=(`echo "$mem_info"|grep Locator|grep -v "Bank Locator"|awk -F : '{print $2}'`)
+
+Ethernet_num=`lspci|grep Ethernet|wc -l`
+Sata_controller_num=`lspci|grep "SATA controller"|wc -l`
+aging_refresh_time=10
+nowtime='date +"%Y/%m/%d %H:%M:%S"'
+
+choice_noclear_test()
+{
+while true
+do
+echo -e "\n\n"
+echo -e "$1" "$2"
+	select the_choice in "pass" "fail and exit" "fail and continue" "back";
+	do
+		if [ "x$the_choice" = "x" ]; then
+			echo -e "\t[`eval $nowtime`] choice illegle" >> $logfile
+		else
+			echo -e "\t[`eval $nowtime`] $1 $2 [$the_choice]" >> $logfile
+		fi
+		break
+	done
+
+	case $the_choice in
+	"pass")
+		return
+		;;
+	"fail and exit")
+		exit -1
+		;;
+	"fail and continue")
+		return
+		;;
+	"back")
+		return 1
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+}
+
+
+choice_test()
+{
+while true
+do
+clear
+echo -e "$1" "$2"
+	select this_choice in "pass" "fail and exit" "fail and continue"  "next" "back";
+	do
+		if [ "x$this_choice" = "x" ]; then
+			echo -e "\t[`eval $nowtime`] choice illegle" >> $logfile
+		else
+			echo -e "\t[`eval $nowtime`] $1 $2 [$this_choice]" >> $logfile
+		fi
+		break
+	done
+
+	case $this_choice in
+	"pass")
+		return
+		;;
+	"fail and exit")
+		exit -1
+		;;
+	"fail and continue")
+		return
+		;;
+	"next")
+		return
+		;;
+	"back")
+		return 1
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+}
+
+system_info() {
+clear
+echo -e "System" | tee -a $logfile
+echo -e "\tDate: $Date" | tee -a $logfile
+echo -e "\tHost name: $Hostname" | tee -a $logfile
+echo -e "\tManager system version: $Manager_version" | tee -a $logfile
+echo -e "\tKernel version: $Kernel_version" | tee -a $logfile
+echo -e "\tMcu firmware version: $Pic_version" | tee -a $logfile
+echo -e "\tWeb version: $Web_version" | tee -a $logfile
+echo -e "\tHardware type: $Hwtype" | tee -a $logfile
+echo -e "\tProduct name: $Product_name" | tee -a $logfile
+echo -e "\tBar code: $bar_code" | tee -a $logfile
+echo -e "\ttester: $tester" | tee -a $logfile
+echo -e "\n" | tee -a $logfile
+
+echo -e "BIOS Information" |tee -a $logfile
+echo -e "\tVendor: `dmidecode -s bios-vendor`" | tee -a $logfile
+echo -e "\tVersion: `dmidecode -s bios-version`" | tee -a $logfile
+echo -e "\tRelease Date: `dmidecode -s bios-release-date`" | tee -a $logfile
+echo -e "\n" | tee -a $logfile
+
+echo -e "CPU" | tee -a $logfile
+echo -e "\t`dmidecode -s processor-version`" | tee -a $logfile
+echo -e "\n" | tee -a $logfile
+
+echo -e "Chipset" | tee -a $logfile
+echo -e "\t`lspci|grep "ISA bridge" |awk -F : '{print $3}'|sed 's/^[ \t]*//g'`" | tee -a $logfile
+echo -e "\n" | tee -a $logfile
+
+echo -e "Memory" | tee -a $logfile
+for ((i=0; i<${#mem_manufacturer[@]}; i++))
+do
+	if [ "x${mem_manufacturer[$i]}" != "x[Empty]" ];then
+		echo -e "\t${mem_manufacturer[$i]} ${mem_type[$i]} ${mem_speed[$i]} MHz ${mem_size[$i]} MB ${mem_locator[$i]}" | tee -a $logfile
+	fi
+done
+echo -e "\n" | tee -a $logfile
+
+echo -e "Ethernet controller" | tee -a $logfile
+for ((i=1; i<=$Eth_num; i++))
+do
+	eth_name=`lspci|grep Ethernet|awk -F : '{print $3}'|sed -n ${i}p|sed 's/^[ \t]//g'`
+	if [ "x$eth_name" != "x" ];then
+		echo -e "\t$eth_name" | tee -a $logfile
+	else
+		echo -e "\tNull" | tee -a $logfile
+	fi
+done
+echo -e "\n" | tee -a $logfile
+
+echo -e "SATA controller" | tee -a $logfile
+for ((i=1; i<=$Sata_controller_num; i++))
+do
+	echo -e "\t`lspci|grep "SATA controller"|awk -F : '{print $3}'|sed -n ${i}p|sed 's/^[ \t]//g'`" | tee -a $logfile
+done
+echo -e "\n" | tee -a $logfile
+
+
+read -p "press any key to continue" continue
+}
+
+#hardware monitor
+monitor_test() {
+echo -e "\n\nHardware monitor" >> $logfile	
+cpu_temp="unknown"
+chassis_temp="unknown"
+fan1_speed="unknown"
+fan2_speed="unknown"
+while true
+do
+clear
+echo -e "Hardware monitor" 
+
+	echo -e "CPU     temp: $cpu_temp"
+	echo -e "Chassis temp: $chassis_temp"
+	echo -e "Fan1 speed: $fan1_speed"
+	echo -e "Fan2 speed: $fan2_speed"
+	echo -e "\n"
+	select choice in "refresh monitor" "pass" "fail and exit" \
+		"fail and continue";
+	do
+		if [ "x$choice" = "x" ]; then
+			echo -e "\t[`eval $nowtime`] refresh monitor" >> $logfile
+		else
+			echo -e "\t[`eval $nowtime`] [$choice]" >> $logfile
+		fi
+		break
+	done
+	case $choice in
+	"pass")
+		break
+		;;
+	"fail and exit")
+		exit -1
+		;;
+	"fail and continue")
+		break
+		;;
+	*)
+		cpu_temp=`sys-manager system --get-info|grep value|sed -n 5p|awk -F [ '{print $2}' \
+		| awk -F : '{print $2}'|tr -d ]`
+		chassis_temp=`sys-manager system --get-info | grep value|sed -n 5p| awk -F [ '{print $3}' \
+		| awk -F : '{print $2}'|tr -d ]|tr -d \"`
+		fan1_speed=`sys-manager system --get-info |grep value|sed -n 6p|awk -F [ '{print $2}' \
+		| awk -F : '{print $2}'|tr -d ]`
+		fan2_speed=`sys-manager system --get-info |grep value|sed -n 6p|awk -F [ '{print $3}' \
+		| awk -F : '{print $2}'|tr -d ]|tr -d \"`
+		;;
+	esac
+done
+}
+
+
+#buzzer
+buzzer_test() {
+echo -e "\n\nBuzzer" >> $logfile
+while true
+do
+clear
+echo -e "Buzzer"
+select choice in "buzzer on" "buzzer off" "next";
+do
+	break
+done
+	case $choice in
+	"buzzer on")
+		buzzer-ctl -s on
+		choice_noclear_test "buzzer on"
+		;;
+	"buzzer off")
+		buzzer-ctl -s off
+		choice_noclear_test "buzzer off"
+		;;
+	"next")
+		break
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+}
+
+
+#sys led
+sysled_test() {
+echo -e "\n\nSystem led" >> $logfile
+while true
+do
+clear
+echo -e "System led"
+select choice in "sys led on" "sys led off" "next";
+do
+	break
+done
+	case $choice in
+	"sys led on")
+		led-ctl -s on
+		choice_noclear_test "sys led on"
+		;;
+	"sys led off")
+		led-ctl -s off
+		choice_noclear_test "sys led off"
+		;;
+	"next")
+		break
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+}
+
+#disk led
+diskled_test() {
+echo -e "\n\nDisk led" >> $logfile
+while true
+do
+clear
+echo -e "Disk led"
+select choice in "all disk red led on" "all disk red led off" "next";
+do
+	break
+done
+	case $choice in
+	"all disk red led on")
+		led-ctl -d on -i all
+		choice_noclear_test "all disk red led on"
+		;;
+	"all disk red led off")
+		led-ctl -d off -i all
+		choice_noclear_test "all disk red led off"
+		;;
+	"next")
+		break
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+}
+
+
+eth_speed_internal_test()
+{
+	a=$1
+	b=$2
+	maca=`ifconfig eth$a|grep HWaddr|awk '{print $NF}'`
+	macb=`ifconfig eth$b|grep HWaddr|awk '{print $NF}'`
+	arp -i eth$a -s 192.168.0.11$a $macb
+	arp -i eth$b -s 192.168.0.11$b $maca
+	
+	
+	iptables -t nat -A POSTROUTING -s 192.168.0.1$a -d 192.168.0.11$a -j SNAT --to-source 192.168.0.11$b
+	iptables -t nat -A PREROUTING -s 192.168.0.11$b -d 192.168.0.11$a -j DNAT --to-destination 192.168.0.1$b
+	iptables -t nat -A POSTROUTING -s 192.168.0.1$b -d 192.168.0.11$b -j SNAT --to-source 192.168.0.11$a
+	iptables -t nat -A PREROUTING -s 192.168.0.11$a -d 192.168.0.11$b -j DNAT --to-destination 192.168.0.1$a
+
+
+}
+
+net_speed_test()
+{
+echo -e "Start testing net adapter speed" >> $logfile
+clear
+echo -e "Ensure your links like this:\n"
+if [ $Eth_num -eq 5 ]; then
+echo -e "\t[eth0]<--->[eth1] [eth2]<--->[eth3] [eth4]"
+elif [ $Eth_num -eq 4 ]; then
+echo -e "\t[eth0]<--->[eth1]  [eth2]<--->[eth3]"
+elif [ $Eth_num -eq 2 ]; then
+echo -e "\t[eth0]<--->[eth1]"
+fi
+echo -e "\n"
+read -p "Enter any key to continue: " continue 
+
+
+clear
+
+iptables -t nat -F
+if [ $1 -eq 1 ]; then 
+	echo -e "Testing net adapter speed..."
+	echo -e ""
+	rm -rf $iperf_tmp
+else	
+	arp -d 192.168.0.110 > /dev/null 2>&1
+	arp -d 192.168.0.114 > /dev/null 2>&1
+	for ((i=0; i<5; i++))
+	do
+		route del -net 192.168.0.0 netmask 255.255.255.0 > /dev/null 2>&1
+	done
+
+fi
+
+killall iperf > /dev/null 2>&1
+killall iperf >/dev/null 2>&1
+#for i in `route -n|awk '{print $1}'|sed 1,2d`; do route del -net $i netmask 255.255.255.255 ; done >/dev/null 2>&1
+
+for ((i=0; i<$Eth_num; i++))
+do	
+	ifconfig eth$i  192.168.0.1$i
+	route add 192.168.0.11$i dev eth$i > /dev/null 2>&1
+done
+
+
+if [ $Eth_num -ge 2 ]; then
+	eth_speed_internal_test 0 1
+	if [ $1 -eq 1 ]; then
+		iperf -s -f M -w 2M -i 5 >> $iperf_tmp 2>&1  &
+		iperf -c 192.168.0.110 -t 10 -d  > /dev/null 2>&1 &
+	else
+		iperf -s -f M -w 2M -l 100000 > /dev/null 2>&1 &
+		cat << EOF >>/tmp/.aging_net_1
+#!/bin/sh
+	while true
+	do
+		iperf -c 192.168.0.110 -l 100000 -d > /dev/null 2>&1
+	done
+EOF
+		chmod +x /tmp/.aging_net_1
+		/tmp/.aging_net_1 &
+	fi
+fi
+
+if [ $Eth_num -ge 4 ]; then
+
+	eth_speed_internal_test 2 3
+	if [ $1 -eq 1 ]; then
+		iperf -c 192.168.0.112 -t 10 -d  > /dev/null 2>&1 &
+	else
+		cat << EOF >> /tmp/.aging_net_2
+#!/bin/sh
+	while true
+	do
+		iperf -c 192.168.0.112 -l 100000 -d > /dev/null 2>&1
+	done
+EOF
+		chmod +x /tmp/.aging_net_2
+		/tmp/.aging_net_2 &
+	fi
+fi
+
+if [ $1 -eq 1 ]; then  
+	sleep 15
+
+	if [ $Eth_num -eq 5 ]; then
+		eth_num=4
+	else
+		eth_num=$Eth_num
+	fi
+
+	for ((i=0; i<$eth_num; i++)); do
+		iperf_num=`cat $iperf_tmp|grep "192.168.0.1$i port 5001"|awk '{print $2}'|tr -d ]`
+		speed=`cat $iperf_tmp|grep 5.0-10.0|grep "$iperf_num\]"|awk '{print $7}'`
+	
+		if [ $(($speed)) -ge $net_speed_limit ];then
+			echo "eth$i speed test: pass"
+			echo -e "\t[`eval $nowtime`] eth$i speed $speed pass" >> $logfile
+		else
+			echo "eth$i speed test: failed"
+			echo -e "\t[`eval $nowtime`] eth$i speed $speed failed" >> $logfile
+		fi
+		
+	done
+		echo -e "\n\n"
+		read -p "Enter any key to continue: " continue 
+
+	if [ $Eth_num -eq 5 ]; then
+		clear
+		iptables -t nat -F
+		
+		arp -d 192.168.0.110
+		arp -d 192.168.0.114
+		echo -e "Ensure eth4 link with eth0:\n"
+		echo -e "\t  ____________________________"
+		echo -e "\t |                            |"
+		echo -e "\t[eth0] [eth1] [eth2] [eth3] [eth4]"
+		echo -e "\n"
+		read -p "Enter any key to continue: " continue 
+		clear
+		echo -e "Testing eth4 speed..."
+		echo -e "\n"
+
+		eth_speed_internal_test 4 0
+		iperf -c 192.168.0.110 -t 10 -d -B 192.168.0.14 > /dev/null 2>&1 &
+	
+		sleep 15
+		killall iperf > /dev/null 2>&1
+		killall iperf > /dev/null 2>&1
+		iperf_num=`cat $iperf_tmp|grep "192.168.0.14 port 5001"|awk '{print $2}'|tr -d ]`
+		speed=`cat $iperf_tmp|grep 5.0-10.0|grep "$iperf_num\]"|awk '{print $7}'`
+		if [ $(($speed)) -ge $net_speed_limit ];then
+			echo "eth4 speed test: pass "
+			echo -e "\t[`eval $nowtime`] eth4 speed $speed pass" >> $logfile
+		else
+			echo "eth4 speed test: failed"
+			echo -e "\t[`eval $nowtime`] eth4 speed $speed failed" >> $logfile
+		fi
+
+		echo -e "\n\n"
+		read -p "Enter any key to continue: " continue 
+	fi
+fi
+
+
+}
+
+#net 未完成
+net_test()
+{
+echo -e "\n\nNet" >> $logfile
+echo -e "Start testing net led..." >> $logfile
+	eths=""
+	for ((i=0; i<$Ethernet_num; i++))
+	do
+		eths="$eths eth$i"		
+	done
+while true
+clear
+echo -e "Net"
+do
+	select choice in "led" "next";
+	do
+	       if [ "x$choice" = "x" ]; then
+			echo -e "\t[`eval $nowtime`] choice illegle" >> $logfile
+		else
+			echo -e "\t[`eval $nowtime`] $choice" >> $logfile
+		fi
+		break
+	done
+	case $choice in
+	"led")
+		for eth in $eths
+		do
+			choice_test $eth "green led on"
+			if [ $? -eq 1 ]; then
+				break
+			fi	
+			choice_test $eth "orange led blink"
+			if [ $? -eq 1 ]; then
+				break
+			fi
+		done
+	       ;;
+	"next")
+		break
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+
+net_speed_test 1
+
+}
+
+disk_internal_test()
+{
+
+
+for ((i=1; i<=$Disk_num; i++))
+do
+	clear
+	slot_info=`disk --list|grep "0:$i"|awk -F , '{ print $2" "$3" "$5" "$9}'|tr -d \" | tr -d }]`
+	if [ -n "$slot_info" ]; then
+		slot_model=`echo $slot_info|awk '{print $1}'|awk -F : '{print $2}'`
+		slot_serial=`echo $slot_info|awk '{print $2}'|awk -F : '{print $2}'`
+		slot_capacity=`echo $slot_info|awk '{print $3}'|awk -F : '{print $2}'`
+		slot_dev=`echo $slot_info|awk '{print $4}'|awk -F : '{print $2}'`
+		slot_dev_true=`echo $slot_dev|awk -F / '{print $3}'`
+		
+		choice_test "slot $i: $slot_model $slot_serial `expr $slot_capacity / 1000000000000`T $slot_dev"
+		if [ $? -eq 1 ]; then
+			break
+		fi
+		choice_noclear_test "slot $i: disk blue led on"
+		if [ $? -eq 1 ]; then
+			break
+		fi
+				
+		rm -rf $dd_tmp
+		echo -e "\n\nslot $i: testing read speed..."
+		dd if=$slot_dev of=/dev/null bs=4096 > /dev/null 2>&1  & 
+	       	pid=$!
+		iostat -m $slot_dev 5 2 > $dd_tmp  2>&1 &
+		sleep 11
+		kill -9  $pid >/dev/null 2>&1 
+		disk_speed=`cat $dd_tmp | grep ${slot_dev_true}|sed -n 2p|awk '{print $3}'|awk -F . '{print $1}'`
+		if [ $disk_speed -gt 120 ]; then
+			echo -e "\t read speed pass"
+			echo -e "\t[`eval $nowtime`] slot $i: read speed $disk_speed pass" >> $logfile
+		else
+			echo -e "\t read speed failed"
+			echo -e "\t[`eval $nowtime`] slot $i: read speed $disk_speed failed" >> $logfile
+		fi
+		
+
+		echo -e "\n\nslot $i: test write speed..."
+		dd if=/dev/zero of=$slot_dev bs=4096 > /dev/null 2>&1 	&
+	       	pid=$!
+		if [ "x$Product_name" = "xSYS-6036C-T(3U-C216)" ]; then
+			choice_noclear_test "slot $i: disk blue led blink"
+			if [ $? -eq 1 ]; then
+				break
+			fi
+		fi
+
+		iostat -m $slot_dev 5 2 > $dd_tmp  2>&1 &
+		sleep 11 
+		kill  -9 $pid >/dev/null 2>&1 
+		disk_speed=`cat $dd_tmp | grep ${slot_dev_true}|sed -n 2p|awk '{print $4}'|awk -F . '{print $1}'`
+		if [ $disk_speed -gt 100 ]; then
+			echo -e "\t write speed pass"
+			echo -e "\t[`eval $nowtime`] slot $i: write speed $disk_speed pass" >> $logfile
+		else
+			echo -e "\t write speed failed"
+			echo -e "\t[`eval $nowtime`] slot $i: write speed $disk_speed failed" >> $logfile
+		fi
+		read  continue 
+
+
+		
+	else
+		choice_test "slot $i: NULL"
+		if [ $? -eq 1 ]; then
+			break
+		fi
+	fi
+
+
+done
+}
+#Disk 未完成
+disk_test()
+{
+echo -e "\n\nDisk" >> $logfile
+while true
+clear
+echo -e "Disk"
+do
+	select choice in "disk" "next";
+	do
+	       if [ "x$choice" = "x" ]; then
+			echo -e "\t[`eval $nowtime`] choice illegle" >> $logfile
+		else
+			echo -e "\t[`eval $nowtime`] $choice" >> $logfile
+		fi
+		break
+	done
+	case $choice in
+	"disk")
+		disk_internal_test
+	       ;;
+	"next")
+		break
+		;;
+	*)
+		continue
+		;;
+	esac
+done
+
+}
+
+
+test_io()
+{
+	local file
+	local disks
+	local disk
+
+	sys_part=`mount -l |grep " / " | cut -d ' ' -f 1`
+	if [ -L $sys_part ];then
+		sys_part=`ls -l $sys_part | awk '{print $NF}'`
+	fi
+	sys_part=`basename $sys_part`
+	SYS_DISK=`echo $sys_part|tr -d [:digit:]`
+	
+	disks=`ls /sys/block | grep "sd" | grep -v "$SYS_DISK"`
+	
+	for disk in $disks
+	do
+		file=/tmp/.aging_io_$disk
+		cat << EOF >$file
+#!/bin/sh
+while true
+do
+	if [ ! -b /dev/$disk ]; then
+		return 1
+	fi						                
+	dd if=/dev/zero of=/dev/$disk bs=1M >/dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M >/dev/null 2>&1
+	sleep 1   
+	##防止因为dd 发送数据到内核 引起的iostat显示数据过高
+done
+EOF
+		chmod +x $file
+		$file &
+	done
+	file=/tmp/.aging_io_mem
+	cat << EOF >$file
+#!/bin/bash
+sleep 10
+
+if mount -l | grep -q " $IO_MEM_DIR "; then
+	umount $IO_MEM_DIR
+fi
+rm -rf $IO_MEM_DIR
+
+free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
+let free_mem-=100
+if [ \$free_mem -lt 100 ]; then
+	exit 0
+fi
+
+mkdir $IO_MEM_DIR
+mount -t tmpfs -o size=\${free_mem}m tmpfs $IO_MEM_DIR
+
+while true
+do
+	dd if=/dev/zero of=$IO_MEM_DIR/file bs=1M >/dev/null 2>&1
+	dd if=$IO_MEM_DIR/file of=/dev/null bs=1M >/dev/null 2>&1
+	sleep 3
+done
+EOF
+	chmod +x $file
+	$file &
+}
+
+test_cpu()
+{
+	local file
+	local cpuid
+	local cpuids
+	cpuids=`cat /proc/cpuinfo | grep processor | awk '{ print $3 }'`
+	for cpuid in $cpuids
+	do
+		file=/tmp/.aging_cpu_$cpuid
+		cat << EOF >$file
+#!/bin/sh
+yes >/dev/null
+EOF
+		chmod +x $file
+		$file &
+	done
+}
+test_net()
+{
+	net_speed_test	
+}
+
+aging_test()
+{
+echo -e "\n\nAging test" >> $logfile
+status="stop"
+while true
+clear
+echo -e "Aging test: [$status]"
+do
+	select choice in "start" "status" "stop" "pass" "fail and exit" "fail and continue";
+	do
+	       if [ "x$choice" = "x" ]; then
+			echo -e "\t[`eval $nowtime`] choice illegle" >> $logfile
+		else
+			echo -e "\t[`eval $nowtime`] $choice" >> $logfile
+		fi
+		break
+	done
+	case $choice in
+	"start")
+		if [ "x$status"  = "xstop" ];then
+		clear
+		echo "Starting aging test..."
+		echo -e "\t[`eval $nowtime`] start aging test" >> $logfile
+		test_io
+		test_net
+		test_cpu
+		status="running"
+		echo -e "\t[`eval $nowtime`] aging test running"
+		fi
+		while true
+		do
+			clear
+			echo -e "\n\n" >> $logfile
+			sar -d -p -u -n DEV 5 1 | tee -a $logfile
+			echo -e "\n"
+			read -t $aging_refresh_time -p "press \"b\" to back, any key other to refresh: " continue
+			if [ "x$continue" = "xb" ]; then
+				echo -e "\t[`eval $nowtime`] press b to back" >> $logfile
+				break
+			else
+				if [ "x$continue" = "x" ]; then
+					continue="Enter"
+				fi
+				echo -e "\t[`eval $nowtime`] press $continue to refresh" >> $logfile
+			fi
+		done	
+	       ;;
+	"status")
+		while true
+		do
+			clear
+			echo -e "\n\n" >> $logfile
+			sar -d -p -u -n DEV 5 1 | tee -a $logfile
+			echo -e "\n"
+			read -t $aging_refresh_time -p "press \"b\" to back, any key other to refresh: " continue
+			if [ "x$continue" = "xb" ]; then
+				echo -e "\t[`eval $nowtime`] press b to back" >> $logfile
+				break
+			else
+				if [ "x$continue" = "x" ]; then
+					continue="Enter"
+				fi
+				echo -e "\t[`eval $nowtime`] press $continue to refresh" >> $logfile
+			fi
+
+		done	
+		;;
+	"stop")
+		pids=`ps axu|grep aging|awk '{print $2}'`
+		
+		for pid in $pids
+		do
+			kill -9 $pid > /dev/null 2>&1
+		done
+
+		killall dd > /dev/null 2>&1
+		killall yes > /dev/null 2>&1
+		killall iperf > /dev/null 2>&1
+		rm -rf $IO_MEM_DIR/file > /dev/null 2>&1
+		umount $IO_MEM_DIR > /dev/null 2>&1
+		rm -rf /tmp/.aging* > /dev/null 2>&1
+		status="stop"
+		echo -e "\t[`eval $nowtime`] aging test stopped" >> $logfile
+		;;
+	"pass")
+		if [ "x$status" = "xrunning" ];then
+			pids=`ps axu|grep aging|awk '{print $2}'`
+		
+			for pid in $pids
+			do
+				kill -9 $pid > /dev/null 2>&1
+			done
+	
+			killall dd > /dev/null 2>&1
+			killall yes > /dev/null 2>&1
+			killall iperf > /dev/null 2>&1
+			rm -rf $IO_MEM_DIR/file > /dev/null 2>&1
+			umount $IO_MEM_DIR > /dev/null 2>&1
+			rm -rf /tmp/.aging* > /dev/null 2>&1
+			status="stop"
+			echo -e "\t[`eval $nowtime`] aging test stopped" >> $logfile
+		fi
+		break
+		;;
+	"fail and exit")
+		exit -1
+		;;
+	"fail and exit")
+		break
+		;;
+	esac
+done
+}
+
+store_to_usb()
+{
+echo -e "\n\n" >> $logfile
+usb_disk=""
+usb_parts=""
+disks=`ls -al /sys/block/sd* | awk '{print $9}'`
+for disk in $disks
+do 
+	removable=`cat $disk/removable`
+	if [ "x$removable" = "x1" ]; then
+		usb_disk=`echo $disk|awk -F / '{print $NF}'`
+		break
+	fi
+done
+
+if [ "x$usb_disk" = "x" ]; then
+
+	echo -e "No usb device, program exit."
+	echo -e "[`eval $nowtime`] no usb device, program exit." >> $logfile
+	exit 0
+fi
+
+usb_dir=`mount -l |grep ${usb_disk} | awk '{print $3}'`
+if [ "x$usb_dir" != "x" ]; then
+	echo -e "copy logfile to $usb_dir, program exit."
+	echo -e "[`eval $nowtime`] copy logfile to $usb_dir, program exit." >> $logfile
+	cp $logfile $usb_dir
+	exit 0
+else
+	usb_parts=`ls -d /sys/block/$usb_disk/sd*|awk -F / '{print $NF}'` 
+	if [ "x$usb_parts" = "x" ]; then
+		
+		echo -e "$usb_disk have no parts, program exit."
+		echo -e "[`eval $nowtime`]$usb_disk have no parts, program exit." >> $logfile
+		exit 0
+	else
+		if [ ! -d "/mnt/usb" ];then
+			mkdir "/mnt/usb"
+		fi
+		for usb_part in $usb_parts
+		do 
+			echo "usb_part $usb_part"
+			mount /dev/$usb_part /mnt/usb
+			echo -e "copy logfile to $usb_part, then program will exit."
+			echo -e "[`eval $nowtime`] copy logfile to $usb_part, then program will exit." >> $logfile
+			cp $logfile "/mnt/usb"
+			exit 0
+		done
+	fi	
+fi
+}
+
+show_menu()
+{
+	if [ $2 -eq 1 ];then
+		all_menu=("System Info" "Hardware Monitor" "Buzzer" "Sysled" "Diskled" "Net" "Disk")
+	else
+		all_menu=("System Info" "Hardware Monitor" "Buzzer" "Sysled" "Diskled" "Net" "Disk" "Aging")
+	fi
+	clear	
+	if [ $1 -gt ${#all_menu[@]} ];then
+		return
+	fi
+	n=$1
+	echo -e "\t\t Menu"
+	for ((i=0; i<n; i++)); do
+		echo -e "\033[31m ${all_menu[$i]}\033[0m"
+	done
+	for ((; i<${#all_menu[@]}; i++)); 
+	do
+		echo -e " ${all_menu[$i]}"
+	done
+	read continue
+}
+
+read -p "Bar code: " bar_code
+read -p "Tester: " tester
+#bar_code=123
+#tester="lyt"
+
+logfile="jw-aging-$bar_code-$tester.log"
+rm -rf $logfile
+touch $logfile
+
+clear
+show_menu 0
+system_info
+show_menu 1
+monitor_test
+show_menu 2
+buzzer_test
+show_menu 3
+sysled_test
+show_menu 4
+diskled_test
+show_menu 5
+net_test
+show_menu 6
+disk_test
+show_menu 7
+aging_test
+show_menu 8
+system_info
+show_menu 1 1
+monitor_test
+show_menu 2 1
+buzzer_test 
+show_menu 3 1
+sysled_test
+show_menu 4 1
+diskled_test
+show_menu 5 1
+net_test
+show_menu 6 1
+disk_test
+show_menu 7 1
+store_to_usb
+
