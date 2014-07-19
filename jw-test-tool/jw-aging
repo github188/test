@@ -1,0 +1,600 @@
+###############################################################################
+# Author : liyunteng
+# Email : li_yunteng@163.com
+# Created Time : 2014-07-01 17:49
+# Filename : jw-aging.sh
+# Description : 
+###############################################################################
+#!/bin/bash
+Date=`date +"%Y/%m/%d %H:%M:%S"`
+Hostname=`hostname`
+Kernel_version=`uname -r`
+Pic_version=`pic-version`
+iperf_tmp="/tmp/iperf"
+dd_tmp="/tmp/dd"
+net_speed_limit=100
+IO_MEM_DIR="/mnt/tmpfs"
+ERROR_STATUS_FILE="/var/log/jw-aging"
+Product_num=`dmidecode -s baseboard-product-name`
+case $Product_num in
+	"1001")
+		Product_name="SYS-6026B-T(2U-B75)"
+		Eth_num=2
+		Disk_num=8
+		Hwtype="2U-B75"
+		;;
+	"1002")
+		Product_name="SYS-6026N-T(2U-ATOM)"
+		Eth_num=2
+		Disk_num=8
+		Hwtype="2U-ATOM"
+		;;
+	"1003")
+		Product_name="SYS-6036B-T(3U-SIMPLE)"
+		Eth_num=2
+		Disk_num=16
+		Hwtype="3U-SIMPLE"
+		;;
+	"1004")
+		Product_name="SYS-6036C-T(3U-C216)"
+		Eth_num=5
+		Disk_num=16
+		Hwtype="3U-STANDARD"
+		;;
+	"1005")
+		Product_name="SYS-6036Z-T(3U-Z77)"
+		Eth_num=2
+		Disk_num=16
+		Hwtype="3U-STANDARD"
+		;;
+	*)
+		Product_name="Unknown"
+		Eth_num=0
+		Disk_num=0
+		Hwtype="Unknown"
+		;;
+esac
+		
+mem_info=`dmidecode -t memory`
+mem_manufacturer=(`echo "$mem_info"|grep Manufacturer|awk -F : '{print $2}'`)
+mem_type=(`echo "$mem_info"|grep Type|grep -v "Type Detail"| grep -v "Error Correction Type"|awk -F : '{print $2}'`)
+mem_speed=(`echo "$mem_info"|grep Speed|grep -v "Configured Clock Speed"|awk -F : '{print $2}'|awk '{print $1}'`)
+mem_size=(`echo "$mem_info"|grep Size|awk -F : '{print $2}'|awk '{print $1}'`)
+mem_locator=(`echo "$mem_info"|grep Locator|grep -v "Bank Locator"|awk -F : '{print $2}'`)
+
+Ethernet_num=`lspci|grep Ethernet|wc -l`
+Sata_controller_num=`lspci|grep "SATA controller"|wc -l`
+aging_refresh_time=10
+nowtime='date +"%Y/%m/%d %H:%M:%S"'
+
+get_ip()
+{
+	ifconfig eth0 |grep "inet addr"|awk -F : '{print $2}'|tr -d [:alpha:]
+}
+
+auto_ssh()
+{
+
+ip=$1
+passwd=$2
+if [ "x$ip" = "x" ];then
+	echo -e "1"
+fi
+if [ "x$passwd" = "x" ];then
+	echo -e "2"
+fi
+expect -c "
+	set timeout 10
+	spawn ssh-copy-id -i /root/.ssh/id_rsa.pub root@$ip
+	expect \"password:\"
+	send \"$passwd\r\"
+	interact
+"
+}
+
+system_info() {
+echo -e "Date: $Date" 
+echo -e "Host name: $Hostname" 
+echo -e "Kernel version: $Kernel_version" 
+echo -e "Mcu firmware version: $Pic_version" 
+echo -e "Hardware type: $Hwtype" 
+echo -e "Product name: $Product_name" 
+
+iperf -s > /dev/null 2>&1 &
+}
+
+bios_info() {
+echo -e "Vendor: `dmidecode -s bios-vendor`" 
+echo -e "Version: `dmidecode -s bios-version`" 
+echo -e "Release Date: `dmidecode -s bios-release-date`" 
+}
+
+cpu_info() {
+echo -e "`dmidecode -s processor-version`" 
+}
+
+chipset_info(){
+echo -e "`lspci|grep "ISA bridge" |awk -F : '{print $3}'|sed 's/^[ \t]*//g'`" 
+}
+
+memory_info(){
+for ((i=0; i<${#mem_manufacturer[@]}; i++))
+do
+	if [ "x${mem_manufacturer[$i]}" != "x[Empty]" ];then
+		echo -e "${mem_manufacturer[$i]} ${mem_type[$i]} ${mem_speed[$i]} MHz ${mem_size[$i]} MB ${mem_locator[$i]}" 
+	fi
+done
+}
+
+eth_info(){
+for ((i=1; i<=$Eth_num; i++))
+do
+	eth_name=`lspci|grep Ethernet|awk -F : '{print $3}'|sed -n ${i}p|sed 's/^[ \t]//g'`
+	if [ "x$eth_name" != "x" ];then
+		echo -e "$eth_name" 
+	else
+		echo -e "Null" 
+	fi
+done
+}
+
+sata_info(){
+for ((i=1; i<=$Sata_controller_num; i++))
+do
+	echo -e "`lspci|grep "SATA controller"|awk -F : '{print $3}'|sed -n ${i}p|sed 's/^[ \t]//g'`" 
+done
+}
+
+#hardware monitor
+monitor_test() {
+		hwmon=`sys-mon-shell`
+		cpu_temp=`echo "$hwmon"|sed -n 13p|awk '{print $1}'`
+		chassis_temp=`echo "$hwmon"|sed -n 13p |awk '{print $2}'`
+		fan1_speed=`echo "$hwmon"|sed -n 13p|awk '{print $4}'`
+		fan2_speed=`echo "$hwmon"|sed -n 13p|awk '{print $5}'`
+		
+		echo -e "$cpu_temp $chassis_temp $fan1_speed $fan2_speed"
+}
+
+
+#buzzer
+buzzer_test() {
+		
+	buzzer-ctl -s $1
+}
+
+
+#sys led
+sysled_test() {
+		led-ctl -s $1
+}
+
+#disk led
+diskled_test() {
+		led-ctl -d $1 -i all
+}
+
+net_info()
+{
+
+	for ((i=0; i<$Eth_num; i++))
+	do
+		ethtool eth$i |grep Speed|awk '{print $2}'
+	done	
+}
+
+
+net_speed_test()
+{
+sysctl net.ipv4.tcp_tw_recycle=1 > /dev/null 2>&1
+sysctl net.ipv4.tcp_tw_reuse=1 > /dev/null 2>&1
+syctm -p >/dev/null 2>&1
+if [ "x$1" = "xremote" ]; then
+	for ((i=1; i<$Eth_num; i++))
+	do	
+		ifconfig eth$i  192.168.$i.10$i
+	done
+	iperf -c $2 -t 15 > /dev/null 2>&1 &
+	for ((i=1; i<$Eth_num; i++))
+	do
+		iperf -c 192.168.$i.1$i -t 15 > /dev/null 2>&1 &
+	done
+elif [ "x$1" = "xlocal" ];then
+
+	for ((i=1; i<$Eth_num; i++))
+	do
+		ifconfig eth$i 192.168.$i.1$i
+	done
+	iperf -c $2 -t 15  > /dev/null 2>&1 &
+	for ((i=1; i<$Eth_num; i++))
+	do
+		iperf -c 192.168.$i.10$i -t 15 > /dev/null 2>&1 &
+	done
+
+
+rm -rf $iperf_tmp
+sar -n DEV 5 3 > $iperf_tmp
+
+	
+for ((i=0; i<$Eth_num; i++)); do
+	speed=`cat $iperf_tmp|grep eth$i|sed -n 2p | tr -d [:alpha:]|awk '{printf("%3d/%3d", $5/1000, $6/1000)}'`
+	echo -e "$speed MB/s"
+		
+#if [ $(($speed)) -ge $net_speed_limit ];then
+#			echo -e "eth$i speed $speed pass" 
+#		else
+#			echo -e "eth$i speed $speed failed" 
+#		fi
+		
+done
+fi
+}
+
+#net 未完成
+net_test()
+{
+	if [ "x$1" = "x" ]; then
+		return
+	fi
+
+	if [ "x$1" = "xinfo" ]; then
+		net_info
+	else
+		net_speed_test $1 $2 
+	fi
+}
+
+disk_test()
+{
+declare -a all_devs
+for ((i=1; i<=$Disk_num; i++))
+do
+	slot_info=`disk --list|grep "0:$i\""|awk -F , '{ print $2" "$3" "$5" "$6}'|tr -d \" | tr -d }]`
+	if [ -n "$slot_info" ]; then
+		slot_model=`echo $slot_info|awk '{print $1}'|awk -F : '{print $2}'|tr -d "\""`
+		slot_serial=`echo $slot_info|awk '{print $2}'|awk -F : '{print $2}'|tr -d "\""`
+		slot_capacity=`echo $slot_info|awk '{print $3}'|awk -F : '{print $2}'|tr -d bytes \
+			|awk -F [ '{print $2}'|tr -d ]|tr -d "\""`
+		slot_dev=`echo $slot_info|awk '{print $4}'|awk -F : '{print $2}'|tr -d "\""`
+		slot_dev_true=`echo $slot_dev|awk -F / '{print $3}'|tr -d "\""`
+			
+		if [ "x$1" = "xinfo" ];then
+			echo -e "slot $i: $slot_model $slot_serial $slot_capacity  $slot_dev"
+		fi
+
+		all_devs[$i]=$slot_dev
+	else		
+		if [ "x$1" = "xinfo" ];then
+			echo -e  "slot $i: Null"
+		fi
+		all_devs[$i]="Null"
+	fi
+done
+
+if [ "x$1" = "xspeed" ];then
+		rm -rf $dd_tmp
+		killall dd > /dev/null 2>&1
+		sync
+		if [ "x$2" = "x" ];then
+			return
+		fi
+		dev=${all_devs[$2]}
+		if [ "x$dev" = "xNull" ];then
+			echo -e "Null Null"
+			return
+		else
+			dd if=$dev of=/dev/null bs=4096 > /dev/null 2>&1  & 
+		fi
+
+		iostat -m  5 2 > $dd_tmp  2>&1 &
+		sleep 11
+		killall  dd >/dev/null 2>&1 
+
+		dev_base=`echo $dev |awk -F / '{print $3}'`
+		disk_read_speed=`cat $dd_tmp | grep $dev_base|sed -n 2p|awk '{print $3}'|awk -F . '{print $1}'`
+		
+		sleep 5
+		dd if=/dev/zero of=$dev bs=4096 > /dev/null 2>&1 	&
+
+		iostat -m  5 2 > $dd_tmp  2>&1 &
+		sleep 11 
+		killall dd >/dev/null 2>&1
+
+		disk_write_speed=`cat $dd_tmp | grep ${dev_base}|sed -n 2p|awk '{print $4}'|awk -F . '{print $1}'`
+		echo -e "$disk_read_speed $disk_write_speed"
+fi
+
+}
+
+
+test_io()
+{
+	local file
+	local disks
+	local disk
+
+	sys_part=`mount -l |grep " / " | cut -d ' ' -f 1`
+	if [ -L $sys_part ];then
+		sys_part=`ls -l $sys_part | awk '{print $NF}'`
+	fi
+	sys_part=`basename $sys_part`
+	SYS_DISK=`echo $sys_part|tr -d [:digit:]`
+	
+	disks=`ls /sys/block | grep "sd" | grep -v "$SYS_DISK"`
+	
+	for disk in $disks
+	do
+		file=/tmp/.aging_io_$disk
+		cat << EOF >$file
+#!/bin/sh
+while true
+do
+	if [ ! -b /dev/$disk ]; then
+		return 1
+	fi						                
+	dd if=/dev/zero of=/dev/$disk bs=1M >/dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M >/dev/null 2>&1
+	sleep 1   
+	##防止因为dd 发送数据到内核 引起的iostat显示数据过高
+done
+EOF
+		chmod +x $file
+		$file &
+	done
+	file=/tmp/.aging_io_mem
+	cat << EOF >$file
+#!/bin/bash
+sleep 10
+
+if mount -l | grep -q " $IO_MEM_DIR "; then
+	umount $IO_MEM_DIR
+fi
+rm -rf $IO_MEM_DIR
+
+free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
+let free_mem-=100
+if [ \$free_mem -lt 100 ]; then
+	exit 0
+fi
+
+mkdir $IO_MEM_DIR
+mount -t tmpfs -o size=\${free_mem}m tmpfs $IO_MEM_DIR
+
+while true
+do
+	dd if=/dev/zero of=$IO_MEM_DIR/file bs=1M >/dev/null 2>&1
+	dd if=$IO_MEM_DIR/file of=/dev/null bs=1M >/dev/null 2>&1
+	sleep 3
+done
+EOF
+	chmod +x $file
+	$file &
+}
+
+test_cpu()
+{
+	local file
+	local cpuid
+	local cpuids
+	cpuids=`cat /proc/cpuinfo | grep processor | awk '{ print $3 }'`
+	for cpuid in $cpuids
+	do
+		file=/tmp/.aging_cpu_$cpuid
+		cat << EOF >$file
+#!/bin/sh
+yes >/dev/null
+EOF
+		chmod +x $file
+		$file &
+	done
+}
+test_net()
+{
+killall iperf > /dev/null 2>&1
+iperf -s -l 100000 > /dev/null 2>&1 &
+if [ "x$1" = "xremote" ]; then
+	for ((i=1; i<$Eth_num; i++))
+	do	
+		ifconfig eth$i  192.168.$i.10$i
+	done
+
+	for ((i=1; i<$Eth_num; i++))
+	do
+		file="/tmp/.aging_net_eth$i"
+		cat <<EOF >$file
+#!/bin/sh
+while true
+do
+	iperf -c 192.168.$i.1$i -l 100000 -t 3600 > /dev/null 2>&1 
+done
+EOF
+	chmod +x $file
+	$file &
+	done
+
+	
+	file="/tmp/.aging_net_eth0"
+	cat <<EOF > $file
+#!/bin/sh
+while true
+do
+	iperf -c $2 -l 100000 -t 60 > /dev/null 2>&1
+	sleep 3
+done
+EOF
+	chmod +x $file
+	$file &
+	
+elif [ "x$1" = "xlocal" ];then
+
+	for ((i=1; i<$Eth_num; i++))
+	do
+		ifconfig eth$i 192.168.$i.1$i
+	done
+	
+	for ((i=1; i<$Eth_num; i++))
+	do
+		file="/tmp/.aging_net_eth$i"
+		cat <<EOF >$file
+#!/bin/sh
+while true
+do
+	iperf -c 192.168.$i.10$i -l 100000 -t 3600 > /dev/null 2>&1 
+done
+EOF
+	chmod +x $file
+	$file &
+	done
+
+	
+	file="/tmp/.aging_net_eth0"
+	cat <<EOF > $file
+#!/bin/sh
+while true
+do
+	iperf -c $2 -l 100000 -t 60 > /dev/null 2>&1
+	sleep 3
+done
+EOF
+	chmod +x $file
+	$file &
+	
+
+fi
+
+}
+
+aging_test()
+{
+
+	if [ "x$1" = "xstart" ];then
+		
+		test_io
+		test_net $2 $3
+		#test_cpu
+	
+	elif [ "x$1" = "xstatus" ]; then
+		sar -d -p -u -n DEV 5 1
+	elif [ "x$1" = "xstop" ]; then
+		pids=`ps axu|grep aging|awk '{print $2}'`
+		
+		for pid in $pids
+		do
+			kill -9 $pid > /dev/null 2>&1
+		done
+
+		killall dd > /dev/null 2>&1
+		killall yes > /dev/null 2>&1
+		killall iperf > /dev/null 2>&1
+		rm -rf $IO_MEM_DIR/file > /dev/null 2>&1
+		umount $IO_MEM_DIR > /dev/null 2>&1
+		rm -rf /tmp/.aging* > /dev/null 2>&1
+	fi
+}
+
+store_to_usb()
+{
+echo -e "\n\n" 
+usb_disk=""
+usb_parts=""
+disks=`ls -al /sys/block/sd* | awk '{print $9}'`
+for disk in $disks
+do 
+	removable=`cat $disk/removable`
+	if [ "x$removable" = "x1" ]; then
+		usb_disk=`echo $disk|awk -F / '{print $NF}'`
+		break
+	fi
+done
+
+if [ "x$usb_disk" = "x" ]; then
+
+	echo -e "No usb device, program exit."
+	echo -e "[`eval $nowtime`] no usb device, program exit." 
+	exit 0
+fi
+
+usb_dir=`mount -l |grep ${usb_disk} | awk '{print $3}'`
+if [ "x$usb_dir" != "x" ]; then
+	echo -e "copy logfile to $usb_dir, program exit."
+	echo -e "[`eval $nowtime`] copy logfile to $usb_dir, program exit." 
+	cp $logfile $usb_dir
+	exit 0
+else
+	usb_parts=`ls -d /sys/block/$usb_disk/sd*|awk -F / '{print $NF}'` 
+	if [ "x$usb_parts" = "x" ]; then
+		
+		echo -e "$usb_disk have no parts, program exit."
+		echo -e "[`eval $nowtime`]$usb_disk have no parts, program exit." 
+		exit 0
+	else
+		if [ ! -d "/mnt/usb" ];then
+			mkdir "/mnt/usb"
+		fi
+		for usb_part in $usb_parts
+		do 
+			echo "usb_part $usb_part"
+			mount /dev/$usb_part /mnt/usb
+			echo -e "copy logfile to $usb_part, then program will exit."
+			echo -e "[`eval $nowtime`] copy logfile to $usb_part, then program will exit." 
+			cp $logfile "/mnt/usb"
+			exit 0
+		done
+	fi	
+fi
+}
+
+
+case $1 in 
+"ip_address")
+	get_ip
+	;;
+"auto_ssh")
+	auto_ssh $2 $3
+	;;
+"system_info")
+	system_info
+	;;
+"bios_info")
+	bios_info
+	;;
+"cpu_info")
+	cpu_info
+	;;
+"chipset_info")
+	chipset_info
+	;;
+"memory_info")
+	memory_info
+	;;
+"eth_info")
+	eth_info
+	;;
+"net_info")
+	net_info
+	;;
+"sata_info")
+	sata_info
+	;;
+"monitor_test")
+	monitor_test
+	;;
+"buzzer_test")
+	buzzer_test $2
+	;;
+"sysled_test")
+	sysled_test $2
+	;;
+"diskled_test")
+	diskled_test $2
+	;;
+"net_test")
+	net_test $2 $3
+	;;
+"disk_test")
+	disk_test $2 $3 
+	;;
+"aging_test")
+	aging_test $2 $3 $4
+	;;
+esac
