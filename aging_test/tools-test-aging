@@ -2,7 +2,7 @@
 
 version()
 {
-	echo "$PROG_NAME - v1.5 - 20140626 12:26"
+	echo "$PROG_NAME - v1.6 - 20140719 14:05"
 }
 
 usage()
@@ -10,7 +10,7 @@ usage()
 	echo ""
 	version
 	echo "usage:"
-	echo "    $PROG_NAME [--io none|disk|raid [--part <path>]]"
+	echo "    $PROG_NAME [--io none|disk|raid [--part <path>] [--dio]]"
 	echo "        [--net none|both|transmit|receive --role a|b [--eth0-remote-ip <ip>]]"
 	echo "        [--cpu none|full]"
 	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡(第一个网卡除外)按顺序一对一直连,"
@@ -23,6 +23,7 @@ usage()
 	echo "               在测试期间如果磁盘、分区、或者raid发生异常， 在每小时的0，15，30，45分钟时会对相应的io设备"
 	echo "               进行累计错误计数 如果出现故障蜂鸣器会报警"
 	echo "               在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
+	echo "               --dio direct方式读写磁盘"
 	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路." 
 	echo "               自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
 	echo "               如果需要测试第一个网卡eth0, 需要输入'--eth0-remote-ip ip'指定对端的ip地址"
@@ -107,6 +108,8 @@ test_io()
 	local prefix
 	local disks
 	local disk
+	local oflag=""
+	local iflag=""
 
 	if [ "$IO" = "disk" ]; then
 		prefix="sd"
@@ -116,6 +119,11 @@ test_io()
 	disks=`ls /sys/block | grep $prefix | grep -v "$SYS_DISK"`
 	if [ "x$PART" != "x" ]; then
 		disks="${disks} `basename $PART`"
+	fi
+	
+	if [ "$DIO" = "true" ]; then
+		oflag="oflag=direct"
+		iflag="iflag=direct"
 	fi
 	for disk in $disks
 	do
@@ -127,8 +135,8 @@ do
 	if [ ! -b /dev/$disk ]; then
 		return 1
 	fi						                
-	dd if=/dev/zero of=/dev/$disk bs=1M >/dev/null 2>&1
-	dd if=/dev/$disk of=/dev/null bs=1M >/dev/null 2>&1
+	dd if=/dev/zero of=/dev/$disk bs=1M $oflag >/dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M $iflag >/dev/null 2>&1
 	sleep 1   
 	##防止因为dd 发送数据到内核 引起的iostat显示数据过高
 done
@@ -139,6 +147,8 @@ EOF
 			echo "io_${disk}_errors=0" >> $ERROR_STATUS_FILE
 		fi
 	done
+
+	# memory test
 	file=/tmp/.${PROG_NAME}_io_mem
 	cat << EOF >$file
 #!/bin/bash
@@ -150,7 +160,7 @@ fi
 rm -rf $IO_MEM_DIR
 
 free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
-let free_mem-=100
+let free_mem-=300
 if [ \$free_mem -lt 100 ]; then
 	exit 0
 fi
@@ -160,9 +170,18 @@ mount -t tmpfs -o size=\${free_mem}m tmpfs $IO_MEM_DIR
 
 while true
 do
-	dd if=/dev/zero of=$IO_MEM_DIR/file bs=1M >/dev/null 2>&1
+	free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
+	let free_mem-=300
+	if [ \$free_mem -lt 100 ]; then
+		sleep 3
+		continue
+	fi
+	dd if=/dev/zero of=$IO_MEM_DIR/file bs=1M count=\$free_mem >/dev/null 2>&1
+	sleep 1
 	dd if=$IO_MEM_DIR/file of=/dev/null bs=1M >/dev/null 2>&1
-	sleep 3
+	sleep 1
+	rm -f $IO_MEM_DIR/file
+	sleep 1
 done
 EOF
 	chmod +x $file
@@ -344,7 +363,7 @@ monitor()
 	#eval "cat $ERROR_STATUS_FILE"   
 	diskcount=`iostat|wc -l`
 	iostat -m 2 2 |sed "1,$diskcount"d |sed "1,/Device/"d| awk '{print $1"  "$3"  "$4}' > $tmpfile
-	name_io=`cat $ERROR_STATUS_FILE| sed -n '/io/'p | awk -F _ '{print $2}'`
+	name_io=`cat $ERROR_STATUS_FILE| sed -n '/^io_/'p | awk -F _ '{print $2}'`
 	for disk in $name_io 
 	do	
 		orgdisk=$disk
@@ -368,7 +387,7 @@ monitor()
 	##网络错误
 	sar -n DEV 1 3 | sed -n '/Average/'p | sed -e '0,/IFACE/'d -e '/lo/'d | awk \
 		'{if($6<=10) {print $2"  "$6}}' >> ${tmpfile}
-	name=`cat $ERROR_STATUS_FILE | sed -n '/net/'p | awk -F _ '{print $2}'`
+	name=`cat $ERROR_STATUS_FILE | sed -n '/^net_/'p | awk -F _ '{print $2}'`
 	for monitoreth in $name;
 	do
 		monitor_errors=`cat $ERROR_STATUS_FILE | sed -n "/$monitoreth/p" | awk -F = '{print $2}'`
@@ -383,8 +402,8 @@ monitor()
 	done
 	
 	if [ $io_errno -ne 0 -o $net_errno -ne 0 ]; then
-		if [ -f "/usr/local/bin/set-buzzer.sh" ]; then
-			set-buzzer.sh on
+		if [ -f "/usr/local/bin/buzzer-ctl" ]; then
+			buzzer-ctl -s on
 		fi
 	fi
 	if [ $io_errno -ne 0 ]; then
@@ -404,9 +423,6 @@ monitor()
 		sed -i '/NETERROR/d' $ERROR_STATUS_FILE
 	fi
 	
-	
-	
-	
 	#重新启动停掉的进程
 	procs=`ps -ef | grep ".${prog_nam}_"`
 	files=`ls /tmp/.${prog_nam}_*`
@@ -416,8 +432,6 @@ monitor()
 			$file &
 		fi
 	done
-
-
 }
 
 status()
@@ -460,6 +474,7 @@ RUN_STATUS_FILE="/tmp/.status_$PROG_NAME"
 PARAM_ERROR=0
 ROLE=""
 IO="none"
+DIO=""
 NET="none"
 CPU="none"
 ETH0_REMOTE_IP=""
@@ -499,6 +514,9 @@ do
 		IO=$2
 		check_param $1 $2
 		shift
+		;;
+		--dio)
+		DIO="true"
 		;;
 		--net)
 		NET=$2
