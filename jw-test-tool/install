@@ -1,3 +1,0 @@
-#!/bin/bash
-rsync -av ./jw-aging /usr/local/bin/jw-aging
-rsync -av ./jw-test-tool /usr/local/bin/jw-test-tool

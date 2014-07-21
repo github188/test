@@ -93,6 +93,13 @@ QString bash_cmd_read(QString cmd, QString path)
 
 }
 
+int bash_cmd(QString cmd)
+{
+    QString cmd_bash = "bash -c \"" + cmd + "\"";
+    return system(cmd_bash.toLatin1());
+
+}
+
 QString ssh_read(QString cmd, QString path)
 {if (ssh_cmd(cmd) == 0)
         return open_read(path);

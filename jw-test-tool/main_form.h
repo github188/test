@@ -56,6 +56,14 @@ private slots:
 
     void on_comboBox_activated(const QString &arg1);
 
+    void on_pushButton_23_clicked();
+
+    void on_textEdit_destroyed();
+
+    void on_pushButton_24_clicked();
+
+    void on_pushButton_25_clicked();
+
 private:
     Ui::Main_Form *ui;
     QTimer *mon_timer;

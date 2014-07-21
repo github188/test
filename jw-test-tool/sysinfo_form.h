@@ -50,6 +50,8 @@ private:
 
 int ssh_cmd(QString arg);
 
+int bash_cmd(QString cmd);
+
 QString open_read(QString path);
 
 QString cmd_read(QString cmd, QString path);

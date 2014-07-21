@@ -100,7 +100,10 @@ echo -e "Mcu firmware version: $Pic_version"
 echo -e "Hardware type: $Hwtype" 
 echo -e "Product name: $Product_name" 
 
-iperf -s > /dev/null 2>&1 &
+pids=`ps axu|grep "iperf -s -l"|grep -v grep|awk '{print $2}'`
+if [ "x$pids" = "x" ]; then
+	iperf -s  -l 100000 > /dev/null 2>&1 &
+fi
 }
 
 bios_info() {
@@ -179,7 +182,7 @@ net_info()
 
 	for ((i=0; i<$Eth_num; i++))
 	do
-		ethtool eth$i |grep Speed|awk '{print $2}'
+		ethtool eth$i |grep Speed|awk '{print $2}'|tr -d "Mb/s"
 	done	
 }
 
@@ -218,7 +221,7 @@ sar -n DEV 5 3 > $iperf_tmp
 	
 for ((i=0; i<$Eth_num; i++)); do
 	speed=`cat $iperf_tmp|grep eth$i|sed -n 2p | tr -d [:alpha:]|awk '{printf("%3d/%3d", $5/1000, $6/1000)}'`
-	echo -e "$speed MB/s"
+	echo -e "$speed"
 		
 #if [ $(($speed)) -ge $net_speed_limit ];then
 #			echo -e "eth$i speed $speed pass" 
@@ -390,8 +393,14 @@ EOF
 }
 test_net()
 {
-killall iperf > /dev/null 2>&1
-iperf -s -l 100000 > /dev/null 2>&1 &
+
+pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
+for pid in $pids
+do
+	kill -9 $pid > /dev/null 2>&1
+	kill -9 $pid >/dev/null 2>&1
+done
+
 if [ "x$1" = "xremote" ]; then
 	for ((i=1; i<$Eth_num; i++))
 	do	
@@ -418,8 +427,7 @@ EOF
 #!/bin/sh
 while true
 do
-	iperf -c $2 -l 100000 -t 60 > /dev/null 2>&1
-	sleep 3
+	iperf -c $2 -l 100000 -t 3600 > /dev/null 2>&1
 done
 EOF
 	chmod +x $file
@@ -452,8 +460,7 @@ EOF
 #!/bin/sh
 while true
 do
-	iperf -c $2 -l 100000 -t 60 > /dev/null 2>&1
-	sleep 3
+	iperf -c $2 -l 100000 -t 3600 > /dev/null 2>&1
 done
 EOF
 	chmod +x $file
@@ -485,7 +492,14 @@ aging_test()
 
 		killall dd > /dev/null 2>&1
 		killall yes > /dev/null 2>&1
-		killall iperf > /dev/null 2>&1
+		
+	pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
+	for pid in $pids
+	do
+		kill -9 $pid > /dev/null 2>&1
+		kill -9 $pid >/dev/null 2>&1
+	done
+	
 		rm -rf $IO_MEM_DIR/file > /dev/null 2>&1
 		umount $IO_MEM_DIR > /dev/null 2>&1
 		rm -rf /tmp/.aging* > /dev/null 2>&1

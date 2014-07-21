@@ -575,8 +575,8 @@ void Main_Form::on_pushButton_7_clicked()
     QString cmd = tmp_dir + "jw-aging ip_address >" + tmp_file;
     ip_address_local = bash_cmd_read(cmd, tmp_file);
 
-    cmd = tmp_dir + "jw-aging aging_test start local " + ip_address_remote + " >"  + tmp_file;
-    bash_cmd_read(cmd, tmp_file);
+    cmd = tmp_dir + "jw-aging aging_test start local " + ip_address_remote;
+    bash_cmd(cmd);
     /*cmd = tmp_dir + "jw-aging aging_test start remote " + ip_address_local + " >" + tmp_file;
     ssh_read(cmd, tmp_file);
     */
@@ -587,9 +587,10 @@ void Main_Form::on_pushButton_7_clicked()
 
 void Main_Form::on_pushButton_9_clicked()
 {
-    QString cmd = tmp_dir + "jw-aging aging_test stop >" + tmp_file;
-    bash_cmd_read(cmd, tmp_file);
-    ssh_read(cmd, tmp_file);
+    QString cmd = tmp_dir + "jw-aging aging_test stop";
+    bash_cmd(cmd);
+    cmd = "bash -c \""+tmp_dir + "jw-aging aging_test stop \"";
+    ssh_cmd(cmd);
 }
 
 void Main_Form::on_pushButton_10_clicked()
@@ -601,4 +602,23 @@ void Main_Form::on_pushButton_10_clicked()
     cmd = tmp_dir + "jw-aging aging_test status > /tmp/out_remote";
     out = ssh_read(cmd, "/tmp/out_remote");
     ui->textBrowser_2->setText(out);
+}
+
+void Main_Form::on_pushButton_23_clicked()
+{
+    QString str = ui->textEdit->toPlainText();
+    QString cmd = "echo -e \""+str+ "\" > /dev/ttyS0";
+    qDebug() << "str:" << str << "\n" <<"cmd:" << cmd;
+    QString out;
+    bash_cmd(cmd);
+
+}
+
+void Main_Form::on_pushButton_24_clicked()
+{
+    QString cmd = "stty -F /dev/ttyS0 ispeed 115200 ospeed 115200 cs8 -parenb -cstopb clocal cread raw -echo";
+    bash_cmd(cmd);
+    //ssh_cmd(cmd);
+    cmd = "xterm -e cat /dev/ttyS0 &";
+    bash_cmd(cmd);
 }
