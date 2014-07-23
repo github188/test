@@ -7,6 +7,7 @@ warningForm::warningForm(QWidget *parent) :
 {
     ui->setupUi(this);
     setWindowModality(Qt::ApplicationModal);
+    setWindowTitle("Warning");
     setParent(parent);
 
 }

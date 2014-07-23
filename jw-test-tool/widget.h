@@ -29,6 +29,8 @@ private slots:
 
     void on_pushButton_clicked();
 
+    void on_lineEdit_selectionChanged();
+
 private:
     Ui::Widget *ui;
 };

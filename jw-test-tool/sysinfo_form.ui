@@ -39,6 +39,9 @@
          <property name="text">
           <string>后退</string>
          </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup_7</string>
+         </attribute>
         </widget>
        </item>
        <item>
@@ -46,6 +49,9 @@
          <property name="text">
           <string>前进</string>
          </property>
+         <attribute name="buttonGroup">
+          <string notr="true">buttonGroup_7</string>
+         </attribute>
         </widget>
        </item>
       </layout>
@@ -154,25 +160,6 @@
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_3">
-              <property name="minimumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="text">
-               <string>通过</string>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QPushButton" name="pushButton_4">
               <property name="minimumSize">
                <size>
@@ -189,6 +176,31 @@
               <property name="text">
                <string>失败</string>
               </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_5</string>
+              </attribute>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_3">
+              <property name="minimumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>通过</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_5</string>
+              </attribute>
              </widget>
             </item>
            </layout>
@@ -225,25 +237,6 @@
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_13">
-              <property name="minimumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="text">
-               <string>通过</string>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QPushButton" name="pushButton_14">
               <property name="minimumSize">
                <size>
@@ -260,6 +253,31 @@
               <property name="text">
                <string>失败</string>
               </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_6</string>
+              </attribute>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_13">
+              <property name="minimumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>通过</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_6</string>
+              </attribute>
              </widget>
             </item>
            </layout>
@@ -465,7 +483,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>560</y>
+           <y>570</y>
            <width>601</width>
            <height>81</height>
           </rect>
@@ -724,8 +742,8 @@
         <widget class="QWidget" name="layoutWidget">
          <property name="geometry">
           <rect>
-           <x>240</x>
-           <y>990</y>
+           <x>241</x>
+           <y>991</y>
            <width>178</width>
            <height>30</height>
           </rect>
@@ -760,6 +778,9 @@
             <property name="flat">
              <bool>false</bool>
             </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup</string>
+            </attribute>
            </widget>
           </item>
           <item>
@@ -779,6 +800,9 @@
             <property name="autoDefault">
              <bool>false</bool>
             </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup</string>
+            </attribute>
            </widget>
           </item>
          </layout>
@@ -870,25 +894,6 @@
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_19">
-              <property name="minimumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="text">
-               <string>通过</string>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QPushButton" name="pushButton_20">
               <property name="minimumSize">
                <size>
@@ -905,6 +910,31 @@
               <property name="text">
                <string>失败</string>
               </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_3</string>
+              </attribute>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_19">
+              <property name="minimumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>通过</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_3</string>
+              </attribute>
              </widget>
             </item>
            </layout>
@@ -941,25 +971,6 @@
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="pushButton_21">
-              <property name="minimumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="maximumSize">
-               <size>
-                <width>41</width>
-                <height>27</height>
-               </size>
-              </property>
-              <property name="text">
-               <string>通过</string>
-              </property>
-             </widget>
-            </item>
-            <item>
              <widget class="QPushButton" name="pushButton_22">
               <property name="minimumSize">
                <size>
@@ -976,6 +987,31 @@
               <property name="text">
                <string>失败</string>
               </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_4</string>
+              </attribute>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton_21">
+              <property name="minimumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>41</width>
+                <height>27</height>
+               </size>
+              </property>
+              <property name="text">
+               <string>通过</string>
+              </property>
+              <attribute name="buttonGroup">
+               <string notr="true">buttonGroup_4</string>
+              </attribute>
              </widget>
             </item>
            </layout>
@@ -1181,7 +1217,7 @@
          <property name="geometry">
           <rect>
            <x>20</x>
-           <y>560</y>
+           <y>570</y>
            <width>601</width>
            <height>81</height>
           </rect>
@@ -1455,6 +1491,9 @@
             <property name="autoDefault">
              <bool>false</bool>
             </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_2</string>
+            </attribute>
            </widget>
           </item>
           <item>
@@ -1468,6 +1507,9 @@
             <property name="autoDefault">
              <bool>false</bool>
             </property>
+            <attribute name="buttonGroup">
+             <string notr="true">buttonGroup_2</string>
+            </attribute>
            </widget>
           </item>
          </layout>
@@ -1489,6 +1531,51 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>pushButton_4</tabstop>
+  <tabstop>pushButton_3</tabstop>
+  <tabstop>pushButton_14</tabstop>
+  <tabstop>pushButton_13</tabstop>
+  <tabstop>pushButton</tabstop>
+  <tabstop>pushButton_5</tabstop>
+  <tabstop>pushButton_20</tabstop>
+  <tabstop>pushButton_19</tabstop>
+  <tabstop>pushButton_22</tabstop>
+  <tabstop>pushButton_21</tabstop>
+  <tabstop>pushButton_6</tabstop>
+  <tabstop>pushButton_7</tabstop>
+  <tabstop>pushButton_18</tabstop>
+  <tabstop>pushButton_2</tabstop>
+  <tabstop>textEdit_7</tabstop>
+  <tabstop>textEdit_1</tabstop>
+  <tabstop>textEdit_5</tabstop>
+  <tabstop>textEdit_6</tabstop>
+  <tabstop>scrollArea_2</tabstop>
+  <tabstop>lineEdit_3</tabstop>
+  <tabstop>lineEdit</tabstop>
+  <tabstop>lineEdit_2</tabstop>
+  <tabstop>lineEdit_4</tabstop>
+  <tabstop>textEdit_2</tabstop>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>textEdit_12</tabstop>
+  <tabstop>textEdit_13</tabstop>
+  <tabstop>textEdit_14</tabstop>
+  <tabstop>textEdit_15</tabstop>
+  <tabstop>textEdit_16</tabstop>
+  <tabstop>textEdit_17</tabstop>
+  <tabstop>textEdit_11</tabstop>
+  <tabstop>textEdit_3</tabstop>
+  <tabstop>textEdit_4</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
+ <buttongroups>
+  <buttongroup name="buttonGroup_4"/>
+  <buttongroup name="buttonGroup_5"/>
+  <buttongroup name="buttonGroup_6"/>
+  <buttongroup name="buttonGroup_7"/>
+  <buttongroup name="buttonGroup"/>
+  <buttongroup name="buttonGroup_2"/>
+  <buttongroup name="buttonGroup_3"/>
+ </buttongroups>
 </ui>

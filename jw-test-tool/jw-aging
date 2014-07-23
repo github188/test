@@ -84,10 +84,32 @@ if [ "x$passwd" = "x" ];then
 	echo -e "2"
 fi
 expect -c "
-	set timeout 10
+	set timeout 60
 	spawn ssh-copy-id -i /root/.ssh/id_rsa.pub root@$ip
-	expect \"password:\"
-	send \"$passwd\r\"
+	expect {
+	\"*(yes/no)?\" {
+		send \"yes\r\";
+		exp_continue
+	}
+	\"password:\" {
+			send \"$passwd\r\";
+			exp_continue ;
+			expect \"please try again.\"
+	}
+	\"please try again.\" {
+		exp_continue;
+		expect \"password:\"
+	}
+	\"Connection refused\" {
+		exit -1
+	}
+	\"(publickey, password).\" {
+		exit -1
+	}
+	timeout {
+		exit -1
+	}			
+	}
 	interact
 "
 }
@@ -475,15 +497,26 @@ aging_test()
 {
 
 	if [ "x$1" = "xstart" ];then
-		
+		if [ "x$2" = "xlocal" ]; then
+			ssh root@"$3" /usr/local/bin/jw-aging aging_test start remote $4  &
+		fi
 		test_io
 		test_net $2 $3
-		#test_cpu
+		test_cpu
+		if [ "x$2" = "xlocal" ];then
+			sleep 5
+			pids=`ps aux|grep "/usr/local/bin/jw-aging aging_test start remote"|grep -v grep|awk '{print $2}'`
+			for pid in $pids
+			do
+				kill -9 $pid > /dev/null 2>&1
+				kill -9 $pid > /dev/null 2>&1
+			done
+		fi
 	
 	elif [ "x$1" = "xstatus" ]; then
 		sar -d -p -u -n DEV 5 1
 	elif [ "x$1" = "xstop" ]; then
-		pids=`ps axu|grep aging|awk '{print $2}'`
+		pids=`ps axu|grep ".aging_"|grep -v grep|grep -v jw-aging|awk '{print $2}'`
 		
 		for pid in $pids
 		do
@@ -491,6 +524,8 @@ aging_test()
 		done
 
 		killall dd > /dev/null 2>&1
+		killall dd > /dev/null 2>&1
+		killall yes > /dev/null 2>&1
 		killall yes > /dev/null 2>&1
 		
 	pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
@@ -609,6 +644,6 @@ case $1 in
 	disk_test $2 $3 
 	;;
 "aging_test")
-	aging_test $2 $3 $4
+	aging_test $2 $3 $4 $5
 	;;
 esac

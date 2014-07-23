@@ -7,8 +7,10 @@
 #include <QDebug>
 #include <QTimer>
 
-extern QString tmp_dir;
+extern QString bin_dir;
 extern QString tmp_file;
+extern QString tmp_file_local;
+extern QString tmp_file_remote;
 extern QString ip_address_remote;
 int mon_int;
 QString ip_address_local;
@@ -298,29 +300,30 @@ void Main_Form::on_pushButton_2_clicked()
 
     QString out;
     QString cmd;
-    cmd = tmp_dir + "jw-aging monitor_test >" + tmp_file;
-    out = bash_cmd_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging monitor_test >" + tmp_file_local;
+    out = bash_cmd_read(cmd, tmp_file_local);
     QStringList out_list;
     out_list = out.split(" ");
 
     ui->tableWidget->setItem(-1,2, new QTableWidgetItem(out_list.at(0)));
     ui->tableWidget->setItem(2,2, new QTableWidgetItem(out_list.at(2)));
     ui->tableWidget->setItem(3,2, new QTableWidgetItem(out_list.at(3)));
+    ui->tableWidget->setItem(4,2, new QTableWidgetItem(out_list.at(1)));
 
-    out = ssh_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging monitor_test >" + tmp_file_remote;
+    out = ssh_read(cmd, tmp_file_remote);
     out_list = out.split(" ");
 
-    qDebug() << out;
     ui->tableWidget->setItem(-1,3, new QTableWidgetItem(out_list.at(0)));
     ui->tableWidget->setItem(2,3, new QTableWidgetItem(out_list.at(2)));
     ui->tableWidget->setItem(3,3, new QTableWidgetItem(out_list.at(3)));
+    ui->tableWidget->setItem(4,3, new QTableWidgetItem(out_list.at(1)));
 
     mon_int = ui->doubleSpinBox_7->value();
 
 
     if (!mon_timer->isActive()) {
-         mon_timer->start(mon_int * 1000);
-         qDebug() << "timer started.";
+         mon_timer->start(mon_int * 1000); 
     }
 }
 
@@ -335,21 +338,24 @@ void Main_Form:: mon_update()
 
     QString out;
     QString cmd;
-    cmd = tmp_dir + "jw-aging monitor_test >" + tmp_file;
-    out = bash_cmd_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging monitor_test >" + tmp_file_local;
+    out = bash_cmd_read(cmd, tmp_file_local);
     QStringList out_list;
     out_list = out.split(" ");
 
     ui->tableWidget->setItem(-1,2, new QTableWidgetItem(out_list.at(0)));
     ui->tableWidget->setItem(2,2, new QTableWidgetItem(out_list.at(2)));
     ui->tableWidget->setItem(3,2, new QTableWidgetItem(out_list.at(3)));
+    ui->tableWidget->setItem(4,2, new QTableWidgetItem(out_list.at(1)));
 
-    out = ssh_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging monitor_test >" + tmp_file_remote;
+    out = ssh_read(cmd, tmp_file_remote);
     out_list = out.split(" ");
 
     ui->tableWidget->setItem(-1,3, new QTableWidgetItem(out_list.at(0)));
     ui->tableWidget->setItem(2,3, new QTableWidgetItem(out_list.at(2)));
     ui->tableWidget->setItem(3,3, new QTableWidgetItem(out_list.at(3)));
+    ui->tableWidget->setItem(4,3, new QTableWidgetItem(out_list.at(1)));
 
 
 }
@@ -357,19 +363,25 @@ void Main_Form:: mon_update()
 
 void Main_Form::on_doubleSpinBox_7_valueChanged(const QString &arg1)
 {
-
+    if (mon_timer->isActive()) {
+        mon_timer->stop();
+    }
+    mon_int = ui->doubleSpinBox_7->value();
+    if (!mon_timer->isActive()) {
+         mon_timer->start(mon_int * 1000);
+    }
 }
 
 void Main_Form::on_comboBox_currentIndexChanged(const QString &arg1)
 {
-    QString  cmd = tmp_dir + "jw-aging buzzer_test ";
+    QString  cmd = bin_dir + "jw-aging buzzer_test ";
     int index = ui->comboBox->currentIndex();
     if (index == 1) {
        cmd += "on";
-       bash_cmd_read(cmd, tmp_file);
+       bash_cmd(cmd);
     } else if (index == 2){
         cmd += "off";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
     } else if (index == 3) {
         cmd += "on";
         ssh_cmd(cmd);
@@ -379,21 +391,21 @@ void Main_Form::on_comboBox_currentIndexChanged(const QString &arg1)
 
     }else {
         cmd += "off";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
         ssh_cmd(cmd);
     }
 }
 
 void Main_Form::on_comboBox_2_currentIndexChanged(const QString &arg1)
 {
-    QString cmd = tmp_dir + "jw-aging sysled_test ";
+    QString cmd = bin_dir + "jw-aging sysled_test ";
     int index = ui->comboBox_2->currentIndex();
     if (index == 1) {
         cmd += "on";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
     } else if (index == 2) {
         cmd += "off";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
     } else if (index == 3) {
         cmd += "on";
         ssh_cmd(cmd);
@@ -402,7 +414,7 @@ void Main_Form::on_comboBox_2_currentIndexChanged(const QString &arg1)
         ssh_cmd(cmd);
     } else {
         cmd += "off";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
         ssh_cmd(cmd);
     }
 
@@ -410,15 +422,15 @@ void Main_Form::on_comboBox_2_currentIndexChanged(const QString &arg1)
 
 void Main_Form::on_comboBox_3_currentIndexChanged(const QString &arg1)
 {
-    QString cmd=tmp_dir + "jw-aging diskled_test ";
+    QString cmd=bin_dir + "jw-aging diskled_test ";
     int index=ui->comboBox_3->currentIndex();
 
     if (index == 1) {
         cmd += "on";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
     } else if (index == 2) {
         cmd += "off";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
     } else if (index == 3) {
         cmd += "on";
         ssh_cmd(cmd);
@@ -427,7 +439,7 @@ void Main_Form::on_comboBox_3_currentIndexChanged(const QString &arg1)
         ssh_cmd(cmd);
     } else {
         cmd += "off";
-        bash_cmd_read(cmd, tmp_file);
+        bash_cmd(cmd);
         ssh_cmd(cmd);
     }
 
@@ -442,14 +454,17 @@ void Main_Form::on_pushButton_3_clicked()
     QStringList disk_list_local;
     QStringList disk_list_remote;
     int i;
-    QString cmd = tmp_dir + "jw-aging disk_test info >" + tmp_file;
-    disk_info_local = bash_cmd_read(cmd, tmp_file);
+    QString cmd;
+
+    cmd = bin_dir + "jw-aging disk_test info >" + tmp_file_local;
+    disk_info_local = bash_cmd_read(cmd, tmp_file_local);
     disk_list_local = disk_info_local.split("\n");
 
     for (i=0; i<disk_list_local.length(); i++)
        ui->tableWidget_2->setItem(i,1,new QTableWidgetItem(disk_list_local.at(i)));
 
-    disk_info_remote = ssh_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging disk_test info >" + tmp_file_remote;
+    disk_info_remote = ssh_read(cmd, tmp_file_remote);
     disk_list_remote = disk_info_remote.split("\n");
     for (i=0; i<disk_list_remote.length(); i++)
      //qDebug() << i << disk_list_remote.at(i) << "\n";
@@ -459,13 +474,13 @@ void Main_Form::on_pushButton_3_clicked()
 
 void Main_Form::disk_start_local(int row)
 {
-    qDebug() << "local" << row;
-    QString cmd = tmp_dir + "jw-aging disk_test speed "+ QString::number(row+1) + " >" + tmp_file;
+
+    QString cmd;
     QString speed_info;
     QStringList speed_info_list;
 
-    speed_info = bash_cmd_read(cmd, tmp_file);
-    qDebug() <<"speed_info:" << speed_info;
+    cmd = bin_dir + "jw-aging disk_test speed "+ QString::number(row+1) + " >" + tmp_file_local;
+    speed_info = bash_cmd_read(cmd, tmp_file_local);
     speed_info_list = speed_info.split(" ");
 
     ui->tableWidget_2->setItem(row, 4, new QTableWidgetItem(speed_info_list.at(0)));
@@ -475,14 +490,14 @@ void Main_Form::disk_start_local(int row)
 
 void Main_Form::disk_start_remote(int row)
 {
- qDebug() << "remote:" << row;
- QString cmd = tmp_dir + "jw-aging disk_test speed " + QString::number(row+1) + " >" + tmp_file;
+ QString cmd;
  QString speed_info;
  QStringList speed_info_list;
 
- qDebug() << "cmd" << cmd;
- speed_info = ssh_read(cmd, tmp_file);
- qDebug() <<"speed_info:" << speed_info;
+
+ cmd = bin_dir + "jw-aging disk_test speed " + QString::number(row+1) + " >" + tmp_file_remote;
+
+ speed_info = ssh_read(cmd, tmp_file_remote);
  speed_info_list = speed_info.split(" ");
 
  ui->tableWidget_3->setItem(row, 4, new QTableWidgetItem(speed_info_list.at(0)));
@@ -526,12 +541,10 @@ void Main_Form::on_pushButton_6_clicked()
     QStringList net_speed_list_remote;
     int i;
 
-    cmd = tmp_dir + "jw-aging ip_address >" + tmp_file;
-    ip_address_local = bash_cmd_read(cmd, tmp_file);
-    qDebug() << ip_address_local;
+    cmd = bin_dir + "jw-aging ip_address >" + tmp_file_local;
+    ip_address_local = bash_cmd_read(cmd, tmp_file_local);
 
-    cmd = tmp_dir + "jw-aging net_test remote " + ip_address_local + " >" + tmp_file;
-    qDebug() << "cmd:" <<cmd << "\n";
+    cmd = bin_dir + "jw-aging net_test remote " + ip_address_local;
     net_speed_remote = ssh_cmd(cmd);
     /*
     net_speed_list_remote = net_speed_remote.split("\n");
@@ -539,13 +552,12 @@ void Main_Form::on_pushButton_6_clicked()
         ui->tableWidget_8->setItem(i, 4, new QTableWidgetItem(net_speed_list_remote.at(i)));
     */
 
-    cmd = tmp_dir + "jw-aging net_test local " +ip_address_remote + " >" + tmp_file;
-    net_speed_local = bash_cmd_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging net_test local " +ip_address_remote + " >" + tmp_file_local;
+    net_speed_local = bash_cmd_read(cmd, tmp_file_local);
     net_speed_list_local = net_speed_local.split("\n");
 
-    qDebug() << "length:"<<net_speed_list_local.length() << "\n";
     for (i=0; i<net_speed_list_local.length(); i++) {
-        qDebug() << i<<":" << net_speed_list_local.at(i) << "\n";
+        //qDebug() << i<<":" << net_speed_list_local.at(i) << "\n";
         ui->tableWidget_4->setItem(i, 4, new QTableWidgetItem(net_speed_list_local.at(i)));      
         ui->tableWidget_8->setItem(i, 4, new QTableWidgetItem(net_speed_list_local.at(i)));
     }
@@ -553,18 +565,21 @@ void Main_Form::on_pushButton_6_clicked()
 
 void Main_Form::on_pushButton_8_clicked()
 {
-    QString cmd = tmp_dir + "jw-aging net_test info >" + tmp_file;
+    QString cmd;
     QString net_info_local;
     QString net_info_remote;
     QStringList net_info_list_local;
     QStringList net_info_list_remote;
     int i;
-    net_info_local = bash_cmd_read(cmd, tmp_file);
+
+    cmd = bin_dir + "jw-aging net_test info >" + tmp_file_local;
+    net_info_local = bash_cmd_read(cmd, tmp_file_local);
     net_info_list_local = net_info_local.split("\n");
     for (i=0; i<net_info_list_local.length(); i++)
         ui->tableWidget_4->setItem(i, 1, new QTableWidgetItem(net_info_list_local.at(i)));
 
-    net_info_remote = ssh_read(cmd, tmp_file);
+    cmd = bin_dir + "jw-aging net_test info >" + tmp_file_remote;
+    net_info_remote = ssh_read(cmd, tmp_file_remote);
     net_info_list_remote = net_info_remote.split("\n");
     for (i=0; i<net_info_list_remote.length(); i++)
         ui->tableWidget_8->setItem(i, 1, new QTableWidgetItem(net_info_list_remote.at(i)));
@@ -572,35 +587,48 @@ void Main_Form::on_pushButton_8_clicked()
 
 void Main_Form::on_pushButton_7_clicked()
 {
-    QString cmd = tmp_dir + "jw-aging ip_address >" + tmp_file;
-    ip_address_local = bash_cmd_read(cmd, tmp_file);
+    QString cmd;
 
-    cmd = tmp_dir + "jw-aging aging_test start local " + ip_address_remote;
+    cmd = bin_dir + "jw-aging ip_address >" + tmp_file_local;
+    ip_address_local = bash_cmd_read(cmd, tmp_file_local);
+
+
+    cmd = bin_dir + "jw-aging aging_test start local " + ip_address_remote + " " + ip_address_local;
     bash_cmd(cmd);
-    /*cmd = tmp_dir + "jw-aging aging_test start remote " + ip_address_local + " >" + tmp_file;
-    ssh_read(cmd, tmp_file);
-    */
-    cmd = "ssh -f root@"+ip_address_remote + " " + tmp_dir + "jw-aging aging_test start remote " + ip_address_local;\
-    system(cmd.toLatin1());
+
+
+
+    QString out;
+    cmd = bin_dir + "jw-aging aging_test status >" + tmp_file_local;
+    out = bash_cmd_read(cmd, tmp_file_local);
+    ui->textBrowser->setText(out);
+
+    cmd = bin_dir + "jw-aging aging_test status >" + tmp_file_remote;
+    out = ssh_read(cmd, tmp_file_remote);
+    ui->textBrowser_2->setText(out);
 
 }
 
 void Main_Form::on_pushButton_9_clicked()
 {
-    QString cmd = tmp_dir + "jw-aging aging_test stop";
+    QString cmd;
+    cmd = bin_dir + "jw-aging aging_test stop";
     bash_cmd(cmd);
-    cmd = "bash -c \""+tmp_dir + "jw-aging aging_test stop \"";
+    cmd = bin_dir + "jw-aging aging_test stop";
     ssh_cmd(cmd);
 }
 
 void Main_Form::on_pushButton_10_clicked()
 {
-    QString cmd = tmp_dir + "jw-aging aging_test status >/tmp/out_local";
+    QString cmd;
     QString out;
-    out = bash_cmd_read(cmd, "/tmp/out_local");
+
+    cmd = bin_dir + "jw-aging aging_test status >" + tmp_file_local;
+    out = bash_cmd_read(cmd, tmp_file_local);
     ui->textBrowser->setText(out);
-    cmd = tmp_dir + "jw-aging aging_test status > /tmp/out_remote";
-    out = ssh_read(cmd, "/tmp/out_remote");
+
+    cmd = bin_dir + "jw-aging aging_test status >" + tmp_file_remote;
+    out = ssh_read(cmd, tmp_file_remote);
     ui->textBrowser_2->setText(out);
 }
 
@@ -608,7 +636,7 @@ void Main_Form::on_pushButton_23_clicked()
 {
     QString str = ui->textEdit->toPlainText();
     QString cmd = "echo -e \""+str+ "\" > /dev/ttyS0";
-    qDebug() << "str:" << str << "\n" <<"cmd:" << cmd;
+    //qDebug() << "str:" << str << "\n" <<"cmd:" << cmd;
     QString out;
     bash_cmd(cmd);
 

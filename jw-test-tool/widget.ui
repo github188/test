@@ -200,74 +200,6 @@
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QLabel" name="label_7">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>111</width>
-           <height>17</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>111</width>
-           <height>17</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>对测设备用户名</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-         <property name="indent">
-          <number>7</number>
-         </property>
-         <property name="buddy">
-          <cstring>lineEdit_5</cstring>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_2">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>111</width>
-           <height>17</height>
-          </size>
-         </property>
-         <property name="maximumSize">
-          <size>
-           <width>111</width>
-           <height>17</height>
-          </size>
-         </property>
-         <property name="text">
-          <string>对测设备密码</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignCenter</set>
-         </property>
-         <property name="indent">
-          <number>7</number>
-         </property>
-         <property name="buddy">
-          <cstring>lineEdit_4</cstring>
-         </property>
-        </widget>
-       </item>
       </layout>
      </item>
      <item>
@@ -312,35 +244,6 @@
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QLineEdit" name="lineEdit_5">
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>root</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLineEdit" name="lineEdit_4">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="echoMode">
-          <enum>QLineEdit::Password</enum>
-         </property>
-        </widget>
-       </item>
       </layout>
      </item>
     </layout>
@@ -371,6 +274,9 @@
        <property name="text">
         <string>确定</string>
        </property>
+       <property name="autoDefault">
+        <bool>true</bool>
+       </property>
        <property name="default">
         <bool>false</bool>
        </property>
@@ -381,6 +287,64 @@
   </layout>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <tabstops>
+  <tabstop>lineEdit</tabstop>
+  <tabstop>lineEdit_2</tabstop>
+  <tabstop>lineEdit_6</tabstop>
+  <tabstop>lineEdit_3</tabstop>
+  <tabstop>pushButton</tabstop>
+  <tabstop>pushButton_2</tabstop>
+  <tabstop>plainTextEdit</tabstop>
+ </tabstops>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>lineEdit</sender>
+   <signal>selectionChanged()</signal>
+   <receiver>lineEdit</receiver>
+   <slot>clear()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>321</x>
+     <y>211</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>321</x>
+     <y>211</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>lineEdit_2</sender>
+   <signal>selectionChanged()</signal>
+   <receiver>lineEdit_2</receiver>
+   <slot>clear()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>233</x>
+     <y>256</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>236</x>
+     <y>255</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>lineEdit_6</sender>
+   <signal>selectionChanged()</signal>
+   <receiver>lineEdit_6</receiver>
+   <slot>clear()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>285</x>
+     <y>283</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>284</x>
+     <y>283</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
