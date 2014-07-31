@@ -60,8 +60,9 @@ QString bash_cmd_read(QString cmd, QString path);
 
 QString ssh_read(QString cmd, QString path);
 
-void get_time();
+QString get_time();
 
-void log_write(QString str);
+void log_write_local(QString str);
 
+void log_write_remote(QString str);
 #endif // SYSINFO_FORM_H

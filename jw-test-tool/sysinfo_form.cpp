@@ -9,9 +9,12 @@
 #include <QFile>
 #include <QDateTime>
 #include <QDir>
-#include <QPalette>
+#include <QMessageBox>
 #include <QProcess>
 
+extern QString tester;
+extern QString serial_num_local;
+extern QString serial_num_remote;
 extern QString ip_address_remote;
 extern QString tmp_file_local;
 extern QString tmp_file_remote;
@@ -27,10 +30,9 @@ extern QString disk_num_local;
 extern QString disk_num_remote;
 extern QString log_local;
 extern QString log_remote;
+extern int single;
 
 
-
-QString date;
 
 QString serial_num_result_local="unknown";
 QString serial_num_result_remote="unknown";
@@ -59,10 +61,16 @@ int ssh_cmd(QString arg)
 {
     QString cmd;
 
-
     cmd = "ssh root@" + ip_address_remote + " " + arg;
-    return system(cmd.toLatin1());
+    //qDebug() << "ssh:" << cmd;
 
+   if (system(cmd.toLatin1()) != 0){
+           QMessageBox::warning(NULL, "", cmd);
+           qApp->processEvents();
+           return -1;
+        }
+
+    return 0;
 
 }
 
@@ -90,12 +98,22 @@ QString bash_cmd_read(QString cmd, QString path)
 int bash_cmd(QString cmd)
 {
     QString cmd_bash = "bash -c \"" + cmd + "\"";
-    return system(cmd_bash.toLatin1());
+    //qDebug() <<"cmd:"<< cmd_bash;
+
+
+    if(system(cmd_bash.toLatin1()) != 0) {
+        QMessageBox::warning(NULL,"", cmd_bash);
+         qApp->processEvents();
+         return -1;
+    }
+    return 0;
 
 }
 
 QString ssh_read(QString cmd, QString path)
-{if (ssh_cmd(cmd) == 0)
+{
+
+    if (ssh_cmd(cmd) == 0)
         return open_read(path);
      else
 
@@ -104,21 +122,24 @@ QString ssh_read(QString cmd, QString path)
 }
 void log_write_local(QString str)
 {
-    QString cmd = "echo \\\"" + str + "\\\" >> " + log_local;
-    qDebug() << cmd;
-    bash_cmd(cmd);
+    QFile log_local_file(log_local);
+    log_local_file.open(QIODevice::WriteOnly | QIODevice::Append);
+    log_local_file.write(str.toLatin1(), str.length());
+    log_local_file.close();
 }
 
 void log_write_remote(QString str)
 {
-    QString cmd = "echo \\\""+str + "\\\" >> " + log_remote;
-    bash_cmd(cmd);
+    QFile log_remote_file(log_remote);
+    log_remote_file.open(QIODevice::WriteOnly | QIODevice::Append);
+    log_remote_file.write(str.toLatin1(), str.length());
+    log_remote_file.close();
 }
-void get_time()
+QString get_time()
 {
 
     QDateTime datetime = QDateTime::currentDateTime();
-    date = "[" + datetime.toString("yyyy-MM-dd hh:mm:ss") + "]";
+    return "[" + datetime.toString("yyyy-MM-dd hh:mm:ss") + "]";
 
 }
 void sys_type(int product_num, int flag)
@@ -190,6 +211,10 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     QString cmd;
     QString out;
 
+    if (single) {
+        ui->scrollArea_2->setHidden(true);
+    }
+
    get_time();
    cmd = "dmidecode -s baseboard-product-name >" + tmp_file_local;
 
@@ -200,6 +225,7 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
          errinfo += "获取本地bios信息失败\n";
 
    }
+   if (!single) {
    cmd = "dmidecode -s baseboard-product-name >" + tmp_file_remote;
     out = ssh_read(cmd, tmp_file_remote);
     if ( out.length() != 0) {
@@ -207,21 +233,25 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     } else {
          errinfo += "获取对测bios信息失败\n";
     }
-
+   }
     ui->lineEdit->setText(product_name_local);
     ui->lineEdit_2->setText(serial_num_local);
+    if (!single) {
     ui->lineEdit_3->setText(product_name_remote);
     ui->lineEdit_4->setText(serial_num_remote);
+    }
 
     cmd=bin_dir + "jw-aging system_info >" + tmp_file_local;
     system_info_local = bash_cmd_read(cmd, tmp_file_local);
     if (system_info_local.length() == 0) {
         errinfo += "获取本地设备系统信息失败\n";
     }
+    if (!single) {
     cmd=bin_dir + "jw-aging system_info >" + tmp_file_remote;
     system_info_remote = ssh_read(cmd, tmp_file_remote);
     if (system_info_remote.length() == 0) {
         errinfo += "获取对测设备系统信息失败\n";
+    }
     }
 
     cmd = bin_dir + "jw-aging bios_info >" + tmp_file_local;
@@ -229,10 +259,12 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     if (bios_info_local.length() == 0) {
         errinfo += "获取本地设备bios信息失败\n";
     }
+    if (!single) {
     cmd = bin_dir + "jw-aging bios_info >" + tmp_file_remote;
     bios_info_remote = ssh_read(cmd, tmp_file_remote);
     if (bios_info_remote.length() == 0) {
         errinfo += "获取对测设备bios信息失败\n";
+    }
     }
 
     cmd = bin_dir + "jw-aging cpu_info >" + tmp_file_local;
@@ -240,10 +272,12 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     if (cpu_info_local.length() == 0) {
         errinfo += "获取本地设备cpu信息失败\n";
     }
+    if (!single) {
      cmd = bin_dir + "jw-aging cpu_info >" + tmp_file_remote;
     cpu_info_remote = ssh_read(cmd, tmp_file_remote);
     if (cpu_info_remote.length() == 0) {
         errinfo += "获取对测设备cpu信息失败\n";
+    }
     }
 
     cmd = bin_dir + "jw-aging chipset_info >" + tmp_file_local;
@@ -252,11 +286,12 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
         errinfo += "获取本地设备芯片组信息失败\n";
 
     }
-
+    if (!single) {
     cmd = bin_dir + "jw-aging chipset_info >" + tmp_file_remote;
     chipset_info_remote=ssh_read(cmd, tmp_file_remote);
     if (chipset_info_remote.length() == 0) {
          errinfo += "获取本地设备芯片组信息失败\n";
+    }
     }
 
     cmd = bin_dir + "jw-aging memory_info >" + tmp_file_local;
@@ -264,10 +299,12 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     if (mem_info_local.length() == 0) {
         errinfo += "获取本地设备内存信息失败\n";
     }
+    if (!single) {
     cmd = bin_dir + "jw-aging memory_info >" + tmp_file_remote;
     mem_info_remote = ssh_read(cmd, tmp_file_remote);
     if (mem_info_remote.length() == 0) {
         errinfo += "获取对测设备内存信息失败\n";
+    }
     }
 
     cmd = bin_dir + "jw-aging eth_info >" + tmp_file_local;
@@ -275,10 +312,12 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     if (eth_info_local.length() == 0){
         errinfo += "获取本地设备网卡信息失败\n";
     }
+    if (!single){
     cmd = bin_dir + "jw-aging eth_info >" + tmp_file_remote;
     eth_info_remote = ssh_read(cmd, tmp_file_remote);
     if (eth_info_remote.length() == 0) {
         errinfo += "获取对测设备网卡信息失败\n";
+    }
     }
 
     cmd = bin_dir + "jw-aging sata_info >" + tmp_file_local;
@@ -286,10 +325,12 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     if (sata_info_local.length() == 0) {
         errinfo += "获取本地设备硬盘信息失败\n";
     }
+    if (!single) {
     cmd = bin_dir + "jw-aging sata_info >" + tmp_file_remote;
     sata_info_remote = ssh_read(cmd, tmp_file_remote);
     if (sata_info_remote.length() == 0) {
         errinfo += "获取对测设备硬盘信息失败\n";
+    }
     }
 
 /*
@@ -318,14 +359,15 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
     ui->textEdit_6->setText(eth_info_local);
     ui->textEdit_7->setText(sata_info_local);
 
-    ui->textEdit_11->setText(system_info_remote);
-    ui->textEdit_12->setText(bios_info_remote);
-    ui->textEdit_13->setText(cpu_info_remote);
-    ui->textEdit_14->setText(chipset_info_remote);
-    ui->textEdit_15->setText(mem_info_remote);
-    ui->textEdit_16->setText(eth_info_remote);
-    ui->textEdit_17->setText(sata_info_remote);
-
+    if (!single) {
+    ui->textEdit_14->setText(system_info_remote);
+    ui->textEdit_8->setText(bios_info_remote);
+    ui->textEdit_9->setText(cpu_info_remote);
+    ui->textEdit_10->setText(chipset_info_remote);
+    ui->textEdit_11->setText(mem_info_remote);
+    ui->textEdit_12->setText(eth_info_remote);
+    ui->textEdit_13->setText(sata_info_remote);
+    }
 
 
     QButtonGroup *qbg1 = new QButtonGroup;
@@ -338,6 +380,7 @@ Sysinfo_Form::Sysinfo_Form(QWidget *parent) :
             sys_warning->show();
 
     }
+
 
 }
 
@@ -353,19 +396,19 @@ void Sysinfo_Form::on_pushButton_2_clicked()
     if (product_name_result_local=="unknown") {
        errinfo += "本地设备设备型号未确认\n";
     }
-    if (product_name_result_remote == "unknown") {
+    if (!single && product_name_result_remote == "unknown") {
         errinfo +="对测设备设备型号未确认\n";
     }
     if(serial_num_result_local=="unknown"){
         errinfo += "本地设备条码未确认\n";
     }
-    if (serial_num_result_remote == "unknown") {
+    if (!single && serial_num_result_remote == "unknown") {
         errinfo += "对测设备条码未确认\n";
     }
     if (sysinfo_result_local == "unknown") {
         errinfo += "本地设备系统信息未确认\n";
     }
-    if (sysinfo_result_remote == "unknown") {
+    if (!single && sysinfo_result_remote == "unknown") {
         errinfo += "对测设备系统信息未确认\n";
     }
     if (errinfo.length() != 0) {
@@ -373,16 +416,18 @@ void Sysinfo_Form::on_pushButton_2_clicked()
         warning->show();
     } else {
     QString str;
-    log_remote.truncate(0);
+
     str = "System\n" + system_info_local + "\n\nBios\n" + bios_info_local + "\n\nCPU\n" + cpu_info_local + "\n\nChipset\n" \
             + chipset_info_local + "\n\nMEM\n" + mem_info_local + "\n\nNet\n"  + eth_info_local + "\n\nSata\n" + sata_info_local \
             + "\n\n" + product_name_result_local + "\n" + serial_num_result_local+"\n"+ sysinfo_result_local + "\n\n";
     log_write_local(str);
 
+    if (!single) {
     str = "System\n" + system_info_remote + "\n\nBios\n" + bios_info_remote + "\n\nCPU\n" + cpu_info_remote + "\n\nChipset\n" \
             + chipset_info_remote + "\n\nMEM\n" + mem_info_remote + "\n\nNet\n"  + eth_info_remote + "\n\nSata\n" + sata_info_remote
             + "\n\n" + product_name_result_remote + "\n" + serial_num_result_remote + "\n" + sysinfo_result_remote + "\n\n";
     log_write_remote(str);
+    }
     this->close();
     Main_Form *m = new Main_Form;
     m->show();
@@ -405,7 +450,7 @@ void Sysinfo_Form::on_pushButton_clicked()
     ui->pushButton->setDisabled(true);
     ui->pushButton_5->setEnabled(true);
     get_time();
-    sysinfo_result_local = date+"System:fail";
+    sysinfo_result_local = get_time() +"System:fail";
 
 
 }
@@ -415,7 +460,7 @@ void Sysinfo_Form::on_pushButton_5_clicked()
     ui->pushButton_5->setDisabled(true);
     ui->pushButton->setEnabled(true);
     get_time();
-    sysinfo_result_local = date+"Syetem:pass";
+    sysinfo_result_local = get_time() +"Syetem:pass";
 
 }
 
@@ -423,8 +468,9 @@ void Sysinfo_Form::on_pushButton_6_clicked()
 {
     ui->pushButton_6->setDisabled(true);
     ui->pushButton_7->setEnabled(true);
+
     get_time();
-    sysinfo_result_remote = date+"System:fail";
+    sysinfo_result_remote = get_time()+"System:fail";
 
 
 }
@@ -434,7 +480,7 @@ void Sysinfo_Form::on_pushButton_7_clicked()
     ui->pushButton_7->setDisabled(true);
     ui->pushButton_6->setEnabled(true);
     get_time();
-    sysinfo_result_remote = date+"System:pass";
+    sysinfo_result_remote = get_time()+"System:pass";
 
 }
 
@@ -444,7 +490,7 @@ void Sysinfo_Form::on_pushButton_3_clicked()
     ui->pushButton_3->setDisabled(true);
     ui->pushButton_4->setEnabled(true);
     get_time();
-    product_name_result_local = date+"product name:pass";
+    product_name_result_local = get_time()+"product name:pass";
 }
 
 void Sysinfo_Form::on_pushButton_4_clicked()
@@ -452,7 +498,7 @@ void Sysinfo_Form::on_pushButton_4_clicked()
     ui->pushButton_4->setDisabled(true);
     ui->pushButton_3->setEnabled(true);
     get_time();
-    product_name_result_local = date+"product name:fail";
+    product_name_result_local = get_time()+"product name:fail";
 }
 
 void Sysinfo_Form::on_pushButton_13_clicked()
@@ -461,7 +507,7 @@ void Sysinfo_Form::on_pushButton_13_clicked()
     ui->pushButton_14
                 ->setEnabled(true);
     get_time();
-    serial_num_result_local = date+"serial number:pass";
+    serial_num_result_local = get_time()+"serial number:pass";
 }
 
 
@@ -470,7 +516,7 @@ void Sysinfo_Form::on_pushButton_14_clicked()
     ui->pushButton_14->setDisabled(true);
     ui->pushButton_13->setEnabled(true);
     get_time();
-    serial_num_result_local = date+"serial number:fail";
+    serial_num_result_local = get_time()+"serial number:fail";
 }
 
 void Sysinfo_Form::on_pushButton_19_clicked()
@@ -478,7 +524,7 @@ void Sysinfo_Form::on_pushButton_19_clicked()
     ui->pushButton_19->setDisabled(true);
     ui->pushButton_20->setEnabled(true);
     get_time();
-    product_name_result_remote = date+"product name:pass";
+    product_name_result_remote = get_time()+"product name:pass";
 }
 
 void Sysinfo_Form::on_pushButton_20_clicked()
@@ -486,7 +532,7 @@ void Sysinfo_Form::on_pushButton_20_clicked()
     ui->pushButton_20->setDisabled(true);
     ui->pushButton_19->setEnabled(true);
     get_time();
-    product_name_result_remote = date+"product name:fail";
+    product_name_result_remote = get_time()+"product name:fail";
 }
 
 void Sysinfo_Form::on_pushButton_21_clicked()
@@ -494,7 +540,7 @@ void Sysinfo_Form::on_pushButton_21_clicked()
     ui->pushButton_21->setDisabled(true);
     ui->pushButton_22->setEnabled(true);
     get_time();
-    serial_num_result_remote = date+"serial number:pass";
+    serial_num_result_remote = get_time()+"serial number:pass";
 }
 
 void Sysinfo_Form::on_pushButton_22_clicked()
@@ -502,6 +548,8 @@ void Sysinfo_Form::on_pushButton_22_clicked()
     ui->pushButton_22->setDisabled(true);
     ui->pushButton_21->setEnabled(true);
     get_time();
-    serial_num_result_remote = date+"serial number:fail";
+    serial_num_result_remote = get_time()+"serial number:fail";
 }
+
+
 

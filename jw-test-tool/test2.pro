@@ -16,14 +16,18 @@ SOURCES += main.cpp\
         widget.cpp \
     sysinfo_form.cpp \
     main_form.cpp \
-    warningform.cpp
+    warningform.cpp \
+    jw_thread.cpp
 
 HEADERS  += widget.h \
     sysinfo_form.h \
     main_form.h \
-    warningform.h
+    warningform.h \
+    jw_thread.h
 
 FORMS    += widget.ui \
     sysinfo_form.ui \
     main_form.ui \
     warningform.ui
+
+RESOURCES +=

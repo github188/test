@@ -5,6 +5,8 @@
 #include <QProcess>
 #include <QIODevice>
 
+
+int single;
 QString tester;     //测试热源
 QString serial_num_local;   //本地设备号
 QString serial_num_remote;  //对端设备号
@@ -17,13 +19,12 @@ QString bin_dir="/usr/local/bin/";
 QString log_local;          //本地log
 QString log_remote;         //对测log
 
-
 QString product_name_local;        //
 QString product_name_remote;
-QString eth_num_local;
-QString eth_num_remote;
-QString disk_num_local;
-QString disk_num_remote;
+QString eth_num_local="0";
+QString eth_num_remote="0";
+QString disk_num_local="0";
+QString disk_num_remote="0";
 
 
 
@@ -63,7 +64,7 @@ void Widget::on_pushButton_clicked()
 
     warningForm *warning = new warningForm();
 
-
+    single = 0;
 
    //方便测试
     tester = ui->lineEdit->text();
@@ -82,27 +83,31 @@ void Widget::on_pushButton_clicked()
 
         errinfo += "本地设备条码为空\n";
     }
-    if (serial_num_remote.length() == 0) {
-        errinfo += "对测设备条码为空\n";
+    if (ip_address_remote == "single") {
+        single = 1;
+    } else {
+         if (serial_num_remote.length() == 0) {
+            errinfo += "对测设备条码为空\n";
+        }
+         if (ip_address_remote.length() == 0) {
+
+            errinfo += "对测设备ip未指定\n";
+        }
+
+        if (password_remote.length() == 0) {
+
+            errinfo += "对测设备密码未指定\n";
+        }
     }
-    if (ip_address_remote.length() == 0) {
-
-        errinfo += "对测设备ip未指定\n";
-    }
-
-    if (password_remote.length() == 0) {
-
-        errinfo += "对测设备密码未指定\n";
-    }
-
     if (errinfo.length() != 0) {
         goto error;
     }
 
 
 
-
+    if (!single) {
     outfile.remove();
+
     cmd = "ping -t 30 -c 2 " + ip_address_remote + " >"+ tmp_file;
     out = bash_cmd_read(cmd, tmp_file);
 
@@ -118,6 +123,7 @@ void Widget::on_pushButton_clicked()
     if (out.length() == 1) {
             errinfo +=  "ssh 失败\n";
     }
+    }
 
 error:
     if(errinfo.length() != 0) {
@@ -125,8 +131,14 @@ error:
         warning->show();
     } else {
 
-    log_local = "/tmp/jw-aging-"+tester+"-"+serial_num_local+".log";
-    log_remote = "/tmp/jw-aging-"+tester+"-"+serial_num_remote + ".log";
+        log_local = "/tmp/jw-aging-"+tester+"-"+serial_num_local+".log";
+        log_remote = "/tmp/jw-aging-"+tester+"-"+serial_num_remote + ".log";
+        QFile log_file_local(log_local);
+        log_file_local.remove();
+
+        QFile log_file_remote(log_remote);
+        log_file_remote.remove();
+
     this->close();
     Sysinfo_Form *s= new Sysinfo_Form;
     s->show();
@@ -134,3 +146,4 @@ error:
     }
 
 }
+
