@@ -1,0 +1,9 @@
+#!/bin/sh
+eths=`ls /sys/class/net | grep -v lo`
+i=1
+for eth in $eths
+do
+	ifconfig $eth 192.13.$i.1 netmask 255.255.255.0
+	i=$(($i+1))
+done
+iperf -s -l 100000 > /dev/null 2>&1 &

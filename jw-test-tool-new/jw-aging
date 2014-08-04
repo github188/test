@@ -656,13 +656,13 @@ net_speed_test_new()
 	other_net=0
 	for ((i=0; i<Eth_num; i++))
 	do
-		ifconfig eth$i 192.13.3.$(($i+1)) netmask 255.255.0.0
+		ifconfig eth$i 192.13.$(($i+1)).3 netmask 255.255.255.0
 	done
 
 	ping -W 3 -c 2 192.13.1.1 > /dev/null 2>&1
 
 	if [ $? -ne 0 ] ; then
-		ping -W 3 -c 2 192.13.2.1 > /dev/null 2>&1
+		ping -W 3 -c 2 192.13.1.2 > /dev/null 2>&1
 		if [ $? -ne 0 ]; then
 			echo -e "Null"
 			return
@@ -670,20 +670,20 @@ net_speed_test_new()
 			other_net=2
 			for ((i=0; i<Eth_num; i++)) 
 			do
-				ifconfig eth$i 192.13.1.$(($i+1)) netmask 255.255.0.0
+				ifconfig eth$i 192.13.$(($i+1)).1 netmask 255.255.255.0
 			done
 		fi
 	else
 		other_net=1
 		for ((i=0; i<Eth_num; i++))
 		do
-			ifconfig eth$i 192.13.2.$(($i+1)) netmask 255.255.0.0
+			ifconfig eth$i 192.13.$(($i+1)).2 netmask 255.255.255.0
 		done	
 	fi
 
 	for ((i=0; i<Eth_num; i++))
 	do
-		iperf -c 192.13.$other_net.$((i+1)) -t 15 -d > /dev/nll 2>&1 &
+		iperf -c 192.13.$((i+1)).$other_net -t 15 -d > /dev/nll 2>&1 &
 	done
 
 	rm -rf $iperf_tmp
