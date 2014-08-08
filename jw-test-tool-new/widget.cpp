@@ -13,6 +13,8 @@ QString product_name;
 int eth_num;
 int disk_num;
 QTimer *mon_timer;
+
+ QStringList disk_info_list;
 QString bash_cmd(QString cmd)
 {
     QString cmd_bash = "bash -c \"" + cmd + "\"";
@@ -55,6 +57,7 @@ Widget::Widget(QWidget *parent) :
 
     ui->pushButton_8->setDisabled(true);
 
+    setWindowState(Qt::WindowMaximized);
 
     QString cmd;
     mon_timer = new QTimer(this);
@@ -114,6 +117,11 @@ Widget::Widget(QWidget *parent) :
     if (disk_num == 16) {
         ui->tableWidget_2->setRowCount(8);
         ui->tableWidget_2->setColumnCount(8);
+
+        ui->tableWidget_2->setColumnWidth(0,50);
+        ui->tableWidget_2->setColumnWidth(2, 50);
+        ui->tableWidget_2->setColumnWidth(4, 50);
+        ui->tableWidget_2->setColumnWidth(6,50);
         int j, m, n;
 
         for (j=0, m=0; j<8; j+=2, m++) {
@@ -194,10 +202,12 @@ void Widget::on_pushButton_11_clicked()
 {
     ui->pushButton_11->setDisabled(true);
 
+    ui->tableWidget_2->clearContents();
+    qApp->processEvents();
     int i;
     QString cmd;
     QString disk_info;
-    QStringList disk_info_list;
+
 
     cmd = "jw-aging disk_test info";
     disk_info = bash_cmd(cmd);
@@ -212,12 +222,16 @@ void Widget::on_pushButton_11_clicked()
             m = (i/4)*2;
             n = (i%4)*2;
         }
+
+        QString name = QString::number(i+1) + ":"+disk_info_list.at(i);
+        ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(name));
         if (disk_info_list.at(i) == "Null") {
             ui->tableWidget_2->item(m, n)->setBackgroundColor(Qt::gray);
         }
         if (disk_info_list.at(i) == "Bad") {
             ui->tableWidget_2->item(m,n)->setBackgroundColor(Qt::red);
         }
+
     }
     ui->pushButton_8->setEnabled(true);
     ui->pushButton_11->setEnabled(true);
@@ -227,16 +241,19 @@ void Widget::on_pushButton_11_clicked()
 void Widget::on_pushButton_8_clicked()
 {
 
+     ui->pushButton_8->setDisabled(true);
+     ui->pushButton_11->setDisabled(true);
     QPalette pal = ui->lineEdit_2->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_2->setPalette(pal);
 
     ui->lineEdit_2->setText("正在测试");
-    ui->pushButton_8->setDisabled(true);
+
     int i;
     QString cmd;
     QString disk_speed;
     QStringList disk_speed_list;
+   /*
     QString disk_info;
     QStringList disk_info_list;
     cmd = "jw-aging disk_test info";
@@ -246,10 +263,12 @@ void Widget::on_pushButton_8_clicked()
 
         //QString name= QString::number(i+1) + ":" + disk_info_list.at(i);
         //ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(name));
-       // qDebug() << "i" << i << ":" << disk_info_list.at(i) << "abc";
+      //  qDebug() << "i" << i << ":" << disk_info_list.at(i) << "abc";
+    */
 
-    qApp->processEvents();
     for (i=0; i < disk_info_list.length(); i++) {
+         ui->pushButton_8->setText("测试：" + QString::number(i+1));
+         qApp->processEvents();
         if (disk_info_list.at(i) == "Null" || disk_info_list.at(i) == "Bad") {
             continue;
         } else {
@@ -272,15 +291,16 @@ void Widget::on_pushButton_8_clicked()
         QString write_speed="写：" + disk_speed_list.at(1);
         ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(read_speed));
         ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem(write_speed));
-        ui->pushButton_8->setText("测试：" + QString::number(i+1));
 
-        if (disk_speed_list.at(0).toInt() > DISK_MIN_READ && disk_speed_list.at(1).toInt() < DISK_MIN_WRITE) {
+
+        if (disk_speed_list.at(0).toInt() > DISK_MIN_READ  &&  disk_speed_list.at(1).toInt() > DISK_MIN_WRITE) {
             ui->tableWidget_2->item(m, n-1)->setBackgroundColor(Qt::green);
         } else {
             ui->tableWidget_2->item(m, n-1)->setBackgroundColor(Qt::red);
         }
         qApp->processEvents();
     }
+    ui->pushButton_11->setEnabled(true);
     ui->lineEdit_2->setText("测试完成");
 
 }
