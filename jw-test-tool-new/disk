@@ -1,0 +1,114 @@
+#!/bin/sh
+
+slot_num=0
+
+
+calculate_slot()
+{
+	ata_num=$1
+	machine_type=$2
+	
+	slot_num=0;
+	if [ "$machine_type" = "2U8-ATOM" ]; then
+		case $ata_num in 
+			6) slot_num=1 ;;
+			7) slot_num=2 ;;
+			12) slot_num=3 ;; 
+			11) slot_num=4 ;;
+			5) slot_num=5 ;;
+			8) slot_num=6 ;;
+			9) slot_num=7 ;;
+			10) slot_num=8 ;;
+			*) echo "ata_num:" $ata_num "does not exist"
+		esac
+	elif [ "$machine_type" = "2U8-STANDARD" ]; then
+		case $ata_num in
+			4) slot_num=1 ;;
+			5) slot_num=2 ;;
+			10) slot_num=3 ;;
+			9) slot_num=4 ;;
+			3) slot_num=5 ;;
+			6) slot_num=6 ;;
+			7) slot_num=7 ;;
+			8) slot_num=8 ;;
+			*) echo "ata_num:" $ata_num "does not exist"
+		esac
+	elif [ "$machine_type" = "3U16-SIMPLE" ]; then
+		if [ $ata_num -ge 7 ] && [ $ata_num -le 18 ]; then
+			slot_num=$(($ata_num-7+1))
+		elif [ $ata_num -ge 3 ] && [ $ata_num -le 6 ]; then
+			slot_num=$(($ata_num-3+13))
+		else
+			echo "ata_num:" $ata_num "does not exit"
+		fi
+	elif [ "$machine_type" = "3U16-STANDARD" ]; then
+		if [ $ata_num -ge 7 ] || [ $ata_num -le 22 ]; then
+			slot_num=$(($ata_num-7+1))
+		fi
+	else
+		echo "machine_type error"
+		slot_num=0;
+	fi
+
+}
+
+
+SYS_6026B_T="1001"
+SYS_6026N_T="1002"
+SYS_6036B_T="1003"
+SYS_6036C_T="1004"
+SYS_6036Z_T="1005"
+SYS_6036C_S="1006"
+SYS_6036Z_S="1007"
+
+hw_type="unkown"
+
+product_name=`dmidecode -s baseboard-product-name 2>/dev/null`
+if [ "$product_name" = "$SYS_6026B_T" ]; then
+	hw_type="2U8-STANDARD"
+elif  [ "$product_name" = "$SYS_6026N_T" ]; then
+        hw_type="2U8-ATOM"
+elif  [ "$product_name" = "$SYS_6036B_T" ]; then
+        hw_type="3U16-SIMPLE"
+elif  [ "$product_name" = "$SYS_6036C_T" -o "$product_name" = "$SYS_6036Z_T" ]; then
+        hw_type="3U16-STANDARD"
+elif  [ "$product_name" = "$SYS_6036C_S" -o "$product_name" = "$SYS_6036Z_S" ]; then
+        hw_type="3U16-STANDARD-SAS"
+fi
+
+if [ -f /tmp/.disk_list ]; then
+	rm -f /tmp/.disk_list
+fi
+touch /tmp/.disk_list
+
+ls -l /sys/block | while read line
+do
+	#temp=$(echo $line | grep 'ata[0-9]*/host[0-9]*/target.*/block/sd[a-z]*')
+	temp=$(echo $line | grep '/host[0-9]*/target.*/block/sd[a-z]*')
+	if [ $? -eq 0 ]; then
+		ata_num=$(echo $temp | awk -F /host '{print $2}' | awk -F \/ '{print $1}')
+		ata_num=$(($ata_num+1))
+		if [ $ata_num -le 2 ]; then
+			continue
+		fi
+		calculate_slot $ata_num $hw_type
+	
+		sdx_id=$(echo $temp | awk -F /block/ '{print $2}')
+		dev_name="/dev/$sdx_id"
+
+
+
+		echo "\"slot\"":"\"0:$slot_num\"",  "\"dev\"":"\"$dev_name\""  >> /tmp/.disk_list
+		
+	
+	fi
+done
+
+disk_num=$(wc -l /tmp/.disk_list | awk '{print $1}')
+#if [ "$disk_num" = "0" ]; then
+#	echo "No disk exist"
+#else
+	sort -t: +2 -3 -g /tmp/.disk_list
+#fi
+
+rm -f /tmp/.disk_list

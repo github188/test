@@ -1,0 +1,606 @@
+#!/bin/sh
+
+version()
+{
+	echo "$PROG_NAME - v1.6 - 20140719 14:05"
+}
+
+usage()
+{
+	echo ""
+	version
+	echo "usage:"
+	echo "    $PROG_NAME [--io none|disk|raid [--part <path>] [--dio]]"
+	echo "        [--net none|both|transmit|receive --role a|b [--eth0-remote-ip <ip>]]"
+	echo "        [--cpu none|full]"
+	echo "           如果要测试网络请先确认网络连接. '设备a' 和 '设备b' 网卡(第一个网卡除外)按顺序一对一直连,"
+	echo "           例如: '设备a' 的 'LAN1' 和 '设备b' 的 'LAN1' 连接"
+	echo "           测试启动后会一直运行, 重启后也会自动运行"
+	echo "           测试模块可选, 默认使用该模块第一个可选参数启动测试"
+	echo "           网络模块默认不启动, 启动网络模块时, 必须输入 --role 选项设定本机角色(a/b), 另一端的设备设定相对的角色(b/a)"
+	echo "           io  测试模块参数 disk: 硬盘; raid: 卷组. 自动扫描所有硬盘(系统盘除外)或卷组测试."
+	echo "               如果需要测试系统盘, 在系统盘上新建空闲分区, 输入'--part path'测试, path为分区完整路径, 如/dev/sda2"
+	echo "               在测试期间如果磁盘、分区、或者raid发生异常， 在每小时的0，15，30，45分钟时会对相应的io设备"
+	echo "               进行累计错误计数 如果出现故障蜂鸣器会报警"
+	echo "               在测试io期间不要插入新磁盘，磁盘拔掉之后请重新插入到原来的插槽"
+	echo "               --dio direct方式读写磁盘"
+	echo "           net 测试模块参数 both: 双向链路; transmit: 发送链路; receive: 接收链路." 
+	echo "               自动按指定的角色(a/b)设置网卡(第一个网卡除外)ip地址测试"
+	echo "               如果需要测试第一个网卡eth0, 需要输入'--eth0-remote-ip ip'指定对端的ip地址"
+	echo "               在测试期间如果网络发生异常,在每小时的0,15,30,45分钟会对相应的网络设备进行累计错误计数"
+	echo "               如果net的参数为receive不进行累计错误的计数 如果出现故障蜂鸣器会报警"
+	echo "           cpu 测试模块参数full: 全速运行"
+	echo "               参数 'none' 表示不启动该测试模块"
+	echo ""
+	echo "       $PROG_NAME --stop"
+	echo "           结束测试,显示累计错误,系统重启后不再自动启动测试"
+	echo ""
+	echo "       $PROG_NAME --status"
+	echo "           查看测试程序启动时间、启动的参数、相关模块累计的错误信息,当前有故障的模块信息"
+	echo ""
+	echo "       $PROG_NAME --help"
+	echo "           显示此帮助文档"
+	echo ""	
+	echo "       $PROG_NAME --version"
+	echo "           显示版本信息"
+}
+
+check_arg_io()
+{
+	local sys_part
+	if [ "$IO" != "disk" -a "$IO" != "raid" -a "$IO" != "none" ]; then
+		echo "--io 参数错误"
+		return 1
+	fi
+	sys_part=`mount -l |grep " / " | cut -d ' ' -f 1`
+	if [ -L $sys_part ];then
+		sys_part=`ls -l $sys_part | awk '{print $NF}'`
+	fi
+	sys_part=`basename $sys_part`
+	SYS_DISK=`echo $sys_part|tr -d [:digit:]`
+	if [ "x$PART" != "x" ]; then
+		if [ $sys_part = `basename $PART` ]; then
+			echo "$PART为系统分区，不能做io测试"
+			return 1
+		fi
+		if [ ! -b $PART ] || ls /sys/block | grep -q `basename $PART`; then
+			echo "$PART不是分区"
+			return 1
+		fi
+
+	fi
+
+	return 0
+}
+
+check_arg_net()
+{
+	if [ "$NET" != "both" -a "$NET" != "transmit" -a "$NET" != "receive" -a "$NET" != "none" ]; then
+		echo "--net 参数错误"
+		return 1
+	elif [ "$NET" != "none" -a "$ROLE" != "a" -a "$ROLE" != "b" ]; then
+		echo "--role 参数错误"
+		return 1
+	fi
+
+	if [ "x$ETH0_REMOTE_IP" != "x" ]; then
+		if ! ping -c 4 $ETH0_REMOTE_IP >/dev/null; then
+			echo "ip地址 $ETH0_REMOTE_IP 不通, 请检查ip地址是否正确, 或网络连接是否正常"
+			return 1
+		fi
+	fi
+	return 0
+}
+
+check_arg_cpu()
+{
+	if [ "$CPU" != "full" -a "$CPU" != "none" ]; then
+		echo "--cpu 参数错误"
+		return 1
+	else
+		return 0
+	fi
+}
+
+test_io()
+{
+	local file
+	local prefix
+	local disks
+	local disk
+	local oflag=""
+	local iflag=""
+
+	if [ "$IO" = "disk" ]; then
+		prefix="sd"
+	else
+		prefix="md"
+	fi
+	disks=`ls /sys/block | grep $prefix | grep -v "$SYS_DISK"`
+	if [ "x$PART" != "x" ]; then
+		disks="${disks} `basename $PART`"
+	fi
+	
+	if [ "$DIO" = "true" ]; then
+		oflag="oflag=direct"
+		iflag="iflag=direct"
+	fi
+	for disk in $disks
+	do
+		file=/tmp/.${PROG_NAME}_io_$disk
+		cat << EOF >$file
+#!/bin/sh
+while true
+do
+	if [ ! -b /dev/$disk ]; then
+		return 1
+	fi						                
+	dd if=/dev/zero of=/dev/$disk bs=1M $oflag >/dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M $iflag >/dev/null 2>&1
+	sleep 1   
+	##防止因为dd 发送数据到内核 引起的iostat显示数据过高
+done
+EOF
+		chmod +x $file
+		$file &
+		if [ $REBOOTTIMES -eq 0 ];then
+			echo "io_${disk}_errors=0" >> $ERROR_STATUS_FILE
+		fi
+	done
+
+	# memory test
+	file=/tmp/.${PROG_NAME}_io_mem
+	cat << EOF >$file
+#!/bin/bash
+sleep 10
+
+if mount -l | grep -q " $IO_MEM_DIR "; then
+	umount $IO_MEM_DIR
+fi
+rm -rf $IO_MEM_DIR
+
+free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
+let free_mem-=300
+if [ \$free_mem -lt 100 ]; then
+	exit 0
+fi
+
+mkdir $IO_MEM_DIR
+mount -t tmpfs -o size=\${free_mem}m tmpfs $IO_MEM_DIR
+
+while true
+do
+	free_mem=\`free -m | grep "Mem" | awk '{ print \$4 }'\`
+	let free_mem-=300
+	if [ \$free_mem -lt 100 ]; then
+		sleep 3
+		continue
+	fi
+	dd if=/dev/zero of=$IO_MEM_DIR/file bs=1M count=\$free_mem >/dev/null 2>&1
+	sleep 1
+	dd if=$IO_MEM_DIR/file of=/dev/null bs=1M >/dev/null 2>&1
+	sleep 1
+	rm -f $IO_MEM_DIR/file
+	sleep 1
+done
+EOF
+	chmod +x $file
+	$file &
+}
+
+test_net()
+{
+	local i
+	local eth
+	local eths
+	local str
+	local file
+	local host_addr_local
+	local host_addr_remote
+
+	eths=`ls /sys/class/net | grep "eth[1-9]"`
+
+	if [ "$ROLE" = "a" ]; then
+		host_addr_local=1
+		host_addr_remote=2
+	else
+		host_addr_local=2
+		host_addr_remote=1
+	fi
+
+	if [ "$NET" != "transmit" ]; then
+		file="/tmp/.${PROG_NAME}_net_receive"
+		echo "#!/bin/sh" >$file
+		for eth in $eths
+		do
+			i=`echo $eth | tr -d "eth"`
+			echo "ifconfig $eth 192.168.$i.$host_addr_local" >>$file
+		done
+
+		echo "iperf -s -l 100000 >/dev/null 2>&1" >>$file
+		chmod +x $file
+		$file &
+	fi
+
+	if [ "$NET" = "receive" ]; then
+		return
+	fi
+
+	for eth in $eths
+	do
+		i=`echo $eth | tr -d "eth"`
+		file="/tmp/.${PROG_NAME}_net_transmit_$eth"
+		cat << EOF >$file
+#!/bin/sh
+ifconfig $eth 192.168.$i.$host_addr_local
+
+while true
+	do
+		iperf -c 192.168.$i.$host_addr_remote -l 100000 -t 3600 >/dev/null 2>&1
+		sleep 5
+	done
+EOF
+		chmod +x $file
+		$file &
+		if [ $REBOOTTIMES -eq 0 ];then
+			echo "net_${eth}_errors=0" >>$ERROR_STATUS_FILE
+		fi
+	done
+
+	if [ ! -z $ETH0_REMOTE_IP ];then
+	# 单独处理eth0的发包测试
+		file="/tmp/.${PROG_NAME}_net_transmit_eth0"
+		cat << EOF >$file
+#!/bin/sh
+
+while true
+do
+	iperf -c $ETH0_REMOTE_IP -l 100000 -t 3600 >/dev/null 2>&1
+	sleep 5
+done
+EOF
+		chmod +x $file
+		$file &
+		if [ $REBOOTTIMES -eq 0 ];then
+			echo "net_eth0_errors=0" >> $ERROR_STATUS_FILE
+		fi
+
+	fi
+}
+
+test_cpu()
+{
+	local file
+	local cpuid
+	local cpuids
+	cpuids=`cat /proc/cpuinfo | grep processor | awk '{ print $3 }'`
+	for cpuid in $cpuids
+	do
+		file=/tmp/.${PROG_NAME}_cpu_$cpuid
+		cat << EOF >$file
+#!/bin/sh
+yes >/dev/null
+EOF
+		chmod +x $file
+		$file &
+	done
+}
+
+stop()
+{
+	local file
+	local files
+	local pid
+	local op=$1
+	local count=10
+
+	while true
+	do
+		pid=`ps -ef | grep "${PROG_NAME} --monitor" | grep -v "grep" | awk '{ print $2 }'`
+		if [ ! -z "$pid" ];then
+			if [ $count -ge 0 ];then
+				sleep 1
+				count=$((count-1))
+			else
+				kill -9 $pid
+			fi
+		else
+			break
+		fi
+		
+	done
+
+	cd /tmp
+	files=`ls .${PROG_NAME}_* 2>/dev/null`
+	rm -f .${PROG_NAME}_*
+	for file in $files
+	do
+		killall $file >/dev/null 2>&1
+	done
+
+	killall dd >/dev/null 2>&1
+	killall iperf >/dev/null 2>&1
+	killall iperf >/dev/null 2>&1
+	killall yes >/dev/null 2>&1
+
+	sed -i /"$PROG_NAME"/d /etc/rc.local
+	sed -i /"$PROG_NAME"/d /etc/crontab
+	logger -t [$PROG_NAME] "结束测试"
+
+	if [ -f "$ERROR_STATUS_FILE" ];then
+		echo ""
+		sed -i 's/running/stop/g' $ERROR_STATUS_FILE >/dev/null 2>&1
+		grep -v "IOERROR" $ERROR_STATUS_FILE | grep -v "NETERROR"
+		echo ""
+		rm -I /tmp/.aging-test-status > /dev/null 2>&1
+		mv $ERROR_STATUS_FILE $ERROR_STATUS_FILE`date "+%Y%m%d%H%M%S"` >/dev/null 2>&1
+	else
+		echo "$PROG_NAME 没有运行！"
+	fi
+	
+	if mount -l | grep -q " $IO_MEM_DIR "; then
+		umount $IO_MEM_DIR
+	fi
+	rm -rf $IO_MEM_DIR
+	rm -f $RUN_STATUS_FILE
+}
+
+
+monitor()
+{
+	local files
+	local file
+	local procs
+	local tmpfile=/tmp/.aging-test-status
+	local disk
+	local prog_nam
+	local err_str=""
+	local io_errno=0
+	local net_errno=0
+	prog_nam=`basename $0`
+	
+	##io错误
+	#eval "cat $ERROR_STATUS_FILE"   
+	diskcount=`iostat|wc -l`
+	iostat -m 2 2 |sed "1,$diskcount"d |sed "1,/Device/"d| awk '{print $1"  "$3"  "$4}' > $tmpfile
+	name_io=`cat $ERROR_STATUS_FILE| sed -n '/^io_/'p | awk -F _ '{print $2}'`
+	for disk in $name_io 
+	do	
+		orgdisk=$disk
+		if [ ! -z `echo $disk | sed -n '/sd/'p` ];then
+			disk=`echo $disk|tr -d [:digit:]`
+		fi
+		monitor_io_errors=`cat $ERROR_STATUS_FILE |grep $disk | awk -F = '{print $2}'|awk '{print $1}'`
+		tmpvar=`cat ${tmpfile} |grep $disk`	
+		if [ -z "$tmpvar" ];  then
+			sed -i "s/${disk}.*/${orgdisk}_errors=$((monitor_io_errors+1)) 未检测到硬盘/" $ERROR_STATUS_FILE
+			logger -t [$prog_nam] "$disk 发生io错误 未检测到硬盘"
+			io_errno=1
+		elif [ ! -z `echo $tmpvar | awk '{if ($2<=10&&$3<=10) print $1}'` ];then
+			sed -i "s/${disk}.*/${orgdisk}_errors=$((monitor_io_errors+1))/" $ERROR_STATUS_FILE
+			logger -t [$prog_nam] "$disk 发生io错误"
+			io_errno=1
+		else
+			sed -i "s/${disk}.*/${orgdisk}_errors=${monitor_io_errors}/" $ERROR_STATUS_FILE
+		fi
+	done
+	##网络错误
+	sar -n DEV 1 3 | sed -n '/Average/'p | sed -e '0,/IFACE/'d -e '/lo/'d | awk \
+		'{if($6<=10) {print $2"  "$6}}' >> ${tmpfile}
+	name=`cat $ERROR_STATUS_FILE | sed -n '/^net_/'p | awk -F _ '{print $2}'`
+	for monitoreth in $name;
+	do
+		monitor_errors=`cat $ERROR_STATUS_FILE | sed -n "/$monitoreth/p" | awk -F = '{print $2}'`
+		tmpvar=`cat ${tmpfile} |sed -n "/$monitoreth/"p`
+
+		if [ ! -z "$tmpvar" ]; then
+			sed -i "s/${monitoreth}_errors=.*/${monitoreth}_errors=$((monitor_errors+1))/" $ERROR_STATUS_FILE
+			logger -t [$prog_nam] "$monitoreth 发生网络错误"
+			net_errno=1
+
+		fi
+	done
+	
+	if [ $io_errno -ne 0 -o $net_errno -ne 0 ]; then
+		if [ -f "/usr/local/bin/buzzer-ctl" ]; then
+			buzzer-ctl -s on
+		fi
+	fi
+	if [ $io_errno -ne 0 ]; then
+		echo "tools-test-aging warning: IO error!" | tee /dev/tty0 /dev/pts/[0-9]* 
+		if ! grep -q "IOERROR" $ERROR_STATUS_FILE; then
+			echo "IOERROR" >> $ERROR_STATUS_FILE
+		fi
+	else
+		sed -i '/IOERROR/d' $ERROR_STATUS_FILE
+	fi
+	if [ $net_errno -ne 0 ]; then
+		echo "tools-test-aging warning: Net error!" | tee /dev/tty0 /dev/pts/[0-9]* 
+		if ! grep -q "NETERROR" $ERROR_STATUS_FILE;then
+			echo "NETERROR" >> $ERROR_STATUS_FILE
+		fi
+	else
+		sed -i '/NETERROR/d' $ERROR_STATUS_FILE
+	fi
+	
+	#重新启动停掉的进程
+	procs=`ps -ef | grep ".${prog_nam}_"`
+	files=`ls /tmp/.${prog_nam}_*`
+	for file in $files
+	do
+		if ! echo $procs | grep -q $file; then
+			$file &
+		fi
+	done
+}
+
+status()
+{
+	if [ -f $RUN_STATUS_FILE ]; then
+		echo "$PROG_NAME 正在运行"
+		#cat $RUN_STATUS_FILE
+		cat $ERROR_STATUS_FILE | grep -v "IOERROR" | grep -v "NETERROR"
+		if grep -q "IOERROR" $ERROR_STATUS_FILE;then
+			echo "tools-test-aging warning: IO error!"
+		fi
+		if grep -q "NETERROR" $ERROR_STATUS_FILE;then
+			echo "tools-test-aging warning: Net error!"
+		fi
+	else
+		echo "$PROG_NAME 没有运行"
+	fi
+}
+
+check_param()
+{
+	local op=$1
+	local param=$2
+	if [ "x$param" = "x" ] || echo $param | grep -q "^--"; then
+		echo "选项 $op 参数为空"
+		PARAM_ERROR=1
+	fi
+}
+
+################################# 主程序开始 ###################################
+PROG_NAME=`basename $0`
+if echo $0 | grep -q "^/"; then
+	CMDPATH="$0"
+else
+	CMDPATH="$PWD/$0"
+fi
+CMDLINE="$@"
+
+RUN_STATUS_FILE="/tmp/.status_$PROG_NAME"
+PARAM_ERROR=0
+ROLE=""
+IO="none"
+DIO=""
+NET="none"
+CPU="none"
+ETH0_REMOTE_IP=""
+PART=""
+SYS_DISK=""
+ERROR_STATUS_FILE="/var/log/aging-test-status"
+REBOOTTIMES=0
+IO_MEM_DIR="/tmp/mem"
+if [ ! -z "$1" ]; then
+	if [ "$1" = "--stop" ]; then
+		stop
+		exit 0
+	elif [ "$1" = "--monitor" ]; then
+		monitor
+		exit 0
+	elif [ "$1" = "--status" ]; then
+		status
+		exit 0
+	elif [ "$1" = "--help" ]; then
+		usage
+		exit 0
+	elif [ "$1" = "--version" ]; then
+		version
+		exit 0
+	fi
+fi
+
+while [ ! -z "$1" -a $PARAM_ERROR -ne 1 ]
+do
+	case "$1" in
+		--role)
+		ROLE=$2
+		check_param $1 $2
+		shift
+		;;
+		--io)
+		IO=$2
+		check_param $1 $2
+		shift
+		;;
+		--dio)
+		DIO="true"
+		;;
+		--net)
+		NET=$2
+		check_param $1 $2
+		shift
+		;;
+		--cpu)
+		CPU=$2
+		check_param $1 $2
+		shift
+		;;
+		--eth0-remote-ip)
+		ETH0_REMOTE_IP=$2
+		check_param $1 $2
+		shift
+		;;
+		--part)
+		PART=$2
+		check_param $1 $2
+		shift
+		;;
+		*)
+		echo "错误的选项或参数 $1"
+		usage
+		exit 1
+		;;
+	esac
+	shift
+done
+if [ $PARAM_ERROR -ne 0 ]; then
+	usage
+	exit 1
+fi
+check_ok=0
+check_arg_io && check_arg_net && check_arg_cpu && check_ok=1
+if [ $check_ok -ne 1 ]; then
+	usage
+	exit 1
+fi
+
+if [ "$IO" = "none" ] && [ "$NET" = "none" ] && [ "$CPU" = "none" ]; then
+	echo "没有指定测试模块, 程序退出"
+	usage	
+	exit 0
+fi
+
+if [ -f $RUN_STATUS_FILE ]; then
+	echo "$PROG_NAME 已经运行"
+	cat $RUN_STATUS_FILE
+	echo "请先结束之前的测试, 再启动新的测试"
+	exit 0
+fi
+
+cat << EOF >$RUN_STATUS_FILE
+启动时间: `date "+%Y/%m/%d %H:%M:%S"`
+运行参数: io=$IO, part=$PART; net=$NET, role=$ROLE, eth0_remote_ip=$ETH0_REMOTE_IP; cpu=$CPU
+EOF
+#判断异常重启次数
+if [ -f "$ERROR_STATUS_FILE" ]; then
+	n=`cat $ERROR_STATUS_FILE|sed -n '/abnormal_reboot/'p|awk -F = '{print $2}'`
+	sed -i "s/abnormal_reboot=.*/abnormal_reboot=$((n+1))/" $ERROR_STATUS_FILE
+	REBOOTTIMES=1
+else
+	cat << EOF >$ERROR_STATUS_FILE
+启动时间: `date "+%Y/%m/%d %H:%M:%S"`
+运行参数: io=$IO, part=$PART; net=$NET, role=$ROLE, eth0_remote_ip=$ETH0_REMOTE_IP; cpu=$CPU
+run_status=running
+abnormal_reboot=0
+EOF
+fi
+logger -t [$PROG_NAME] "开始测试"
+cat $RUN_STATUS_FILE | logger -t [$PROG_NAME]
+
+if ! grep -q "$PROG_NAME" /etc/rc.local; then
+	echo "$CMDPATH $CMDLINE &" >>/etc/rc.local
+	echo "0,15,30,45 * * * * root $CMDPATH --monitor" >>/etc/crontab
+	chmod +x /etc/rc.local
+fi
+
+
+[ "$IO" != "none" ] && test_io&
+[ "$NET" != "none" ] && test_net&
+[ "$CPU" != "none" ] && test_cpu&
+
+echo "$PROG_NAME 开始测试"
+sleep 2
+cat $ERROR_STATUS_FILE

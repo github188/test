@@ -4,6 +4,10 @@
 #include <QDebug>
 #include <QProcess>
 #include <QTimer>
+#include <QPalette>
+
+#define  DISK_MIN_READ  120
+#define DISK_MIN_WRITE  100
 
 QString product_name;
 int eth_num;
@@ -11,7 +15,7 @@ int disk_num;
 QTimer *mon_timer;
 QString bash_cmd(QString cmd)
 {
-	QString cmd_bash = "bash -c \"jw-aging " + cmd + "\"";
+    QString cmd_bash = "bash -c \"" + cmd + "\"";
     QString out="";
     QProcess *process = new QProcess();
     qDebug()<<"cmd:"<<cmd_bash;
@@ -19,7 +23,9 @@ QString bash_cmd(QString cmd)
     process->waitForFinished(60000);
 
     out = process->readAllStandardOutput();
-
+    if (out.endsWith("\n")) {
+        out.replace((out.length()-1),1,"");
+    }
     qDebug()<<"out:"<<out;
     return out;
 }
@@ -31,11 +37,23 @@ Widget::Widget(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    QPalette pal = ui->lineEdit->palette();
+    pal.setColor(QPalette::Text,Qt::darkYellow);
+    ui->lineEdit->setPalette(pal);
+
+    pal = ui->lineEdit_2->palette();
+    pal.setColor(QPalette::Text, Qt::darkYellow);
+    ui->lineEdit_2->setPalette(pal);
+
+    pal = ui->lineEdit_3->palette();
+    pal.setColor(QPalette::Text, Qt::darkYellow);
+    ui->lineEdit_3->setPalette(pal);
 
     ui->lineEdit->setText("未启动");
     ui->lineEdit_2->setText("未启动");
     ui->lineEdit_3->setText("未启动");
 
+    ui->pushButton_8->setDisabled(true);
 
 
     QString cmd;
@@ -46,22 +64,22 @@ Widget::Widget(QWidget *parent) :
 
     connect(mon_timer, SIGNAL(timeout()), this, SLOT(mon_update()));
 
-    cmd = "system_info";
+    cmd = "jw-aging system_info";
     product_name = bash_cmd(cmd);
     ui->lineEdit_4->setText(product_name);
-    if (product_name == "SYS-6026B-T(2U-B75)\n") {
+    if (product_name == "SYS-6026B-T(2U-B75)") {
 	    eth_num=2;
 	    disk_num=8;
-    } else if (product_name == "SYS-6026N-T(2U-ATOM)\n"){
+    } else if (product_name == "SYS-6026N-T(2U-ATOM)"){
 	    eth_num=2;
 	    disk_num=8;
-    } else if (product_name == "SYS-6036B-T(3U-SIMPLE)\n") {
+    } else if (product_name == "SYS-6036B-T(3U-SIMPLE)") {
 	    eth_num=2;
 	    disk_num=16;
-    } else if (product_name == "SYS-6036C-T(3U-C216)\n") {
+    } else if (product_name == "SYS-6036C-T(3U-C216)") {
 	    eth_num=5;
 	    disk_num=16;
-    } else if (product_name == "SYS-6036Z-T(3U-Z77)\n") {
+    } else if (product_name == "SYS-6036Z-T(3U-Z77)") {
 	    eth_num=2;
 	    disk_num=16;
     } else {
@@ -69,16 +87,16 @@ Widget::Widget(QWidget *parent) :
 	    disk_num=0;
     }
     
-    cmd = "cpu_info";
+    cmd = "jw-aging cpu_info";
     ui->lineEdit_5->setText(bash_cmd(cmd));
 
-    cmd = "memory_info";
+    cmd = "jw-aging memory_info";
     ui->textEdit->setText(bash_cmd(cmd));
 
-    cmd = "eth_info";
+    cmd = "jw-aging eth_info";
     ui->textEdit_2->setText(bash_cmd(cmd));
 
-    cmd = "fireware";
+    cmd = "jw-aging fireware";
     ui->textEdit_6->setText(bash_cmd(cmd));
 
 	   
@@ -131,16 +149,16 @@ void Widget::mon_update()
     QString cmd;
     QString out;
     QStringList out_list;
-    cmd = "fan";
+    cmd = "jw-aging fan";
     out = bash_cmd(cmd);
     ui->textEdit_4->setText(out);
-    cmd = "power";
+    cmd = "jw-aging power";
     out = bash_cmd(cmd);
     ui->textEdit_5->setText(out);
-    cmd = "cpu";
+    cmd = "jw-aging cpu";
     out = bash_cmd(cmd) + "%";
     ui->lineEdit_8->setText(out);
-    cmd = "mem";
+    cmd = "jw-aging mem";
     out = bash_cmd(cmd);
     //out_list = out.split(";");
 
@@ -149,17 +167,22 @@ void Widget::mon_update()
 
 void Widget::on_pushButton_7_clicked()
 {
+
+    QPalette pal = ui->lineEdit->palette();
+    pal.setColor(QPalette::Text, Qt::green);
+    ui->lineEdit->setPalette(pal);
+
     ui->lineEdit->setText("正在测试");
     ui->pushButton_7->setDisabled(true);
     int i;
     QString cmd;
     QString speed;
     QStringList speed_list;
-    cmd = "net_speed_test_new";
+    cmd = "jw-aging net_speed_test_new";
     speed = bash_cmd(cmd);
     speed_list = speed.split("\n");
     qApp->processEvents();
-    for (i=0; i<(speed_list.length()-1); i++) {
+    for (i=0; i<speed_list.length(); i++) {
       ui->tableWidget->setItem(1, i, new QTableWidgetItem(speed_list.at(i)));
     }
     qApp->processEvents();
@@ -167,21 +190,20 @@ void Widget::on_pushButton_7_clicked()
     ui->pushButton_7->setEnabled(true);
 }
 
-void Widget::on_pushButton_8_clicked()
+void Widget::on_pushButton_11_clicked()
 {
-    ui->lineEdit_2->setText("正在测试");
-    ui->pushButton_8->setDisabled(true);
+    ui->pushButton_11->setDisabled(true);
+
     int i;
     QString cmd;
-    QString disk_speed;
-    QStringList disk_speed_list;
     QString disk_info;
     QStringList disk_info_list;
-    cmd = "disk_test info";
+
+    cmd = "jw-aging disk_test info";
     disk_info = bash_cmd(cmd);
 
     disk_info_list = disk_info.split("\n");
-    for(i=0; i< (disk_info_list.length()-1); i++) {
+    for(i=0; i< disk_info_list.length(); i++) {
         int m, n;
         if (disk_num == 16) {
             m = (i%4)*2;
@@ -190,21 +212,53 @@ void Widget::on_pushButton_8_clicked()
             m = (i/4)*2;
             n = (i%4)*2;
         }
-        QString name= QString::number(i+1) + ":" + disk_info_list.at(i);
-        ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(name));
-        qDebug() << "i" << i << ":" << disk_info_list.at(i) << "abc";
+        if (disk_info_list.at(i) == "Null") {
+            ui->tableWidget_2->item(m, n)->setBackgroundColor(Qt::gray);
+        }
+        if (disk_info_list.at(i) == "Bad") {
+            ui->tableWidget_2->item(m,n)->setBackgroundColor(Qt::red);
+        }
     }
+    ui->pushButton_8->setEnabled(true);
+    ui->pushButton_11->setEnabled(true);
+
+}
+
+void Widget::on_pushButton_8_clicked()
+{
+
+    QPalette pal = ui->lineEdit_2->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_2->setPalette(pal);
+
+    ui->lineEdit_2->setText("正在测试");
+    ui->pushButton_8->setDisabled(true);
+    int i;
+    QString cmd;
+    QString disk_speed;
+    QStringList disk_speed_list;
+    QString disk_info;
+    QStringList disk_info_list;
+    cmd = "jw-aging disk_test info";
+    disk_info = bash_cmd(cmd);
+
+    disk_info_list = disk_info.split("\n");
+
+        //QString name= QString::number(i+1) + ":" + disk_info_list.at(i);
+        //ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(name));
+       // qDebug() << "i" << i << ":" << disk_info_list.at(i) << "abc";
+
     qApp->processEvents();
-    for (i=0; i < (disk_info_list.length()-1); i++) {
-        if (disk_info_list.at(i).contains("Null")) {
-            disk_speed = "Null Null";
+    for (i=0; i < disk_info_list.length(); i++) {
+        if (disk_info_list.at(i) == "Null" || disk_info_list.at(i) == "Bad") {
+            continue;
         } else {
-            cmd = "disk_test speed " + QString::number(i+1);
+            cmd = "jw-aging disk_test speed " + QString::number(i+1);
             disk_speed=bash_cmd(cmd);
         }
-        qDebug() << "disk_speed:" <<disk_speed;
+       // qDebug() << "disk_speed:" <<disk_speed;
         disk_speed_list = disk_speed.split(" ");
-        qDebug() << "disk_speed_list[0]" << disk_speed_list.at(0) << " disk_speed_list[1]:" <<disk_speed_list.at(1);
+        //qDebug() << "disk_speed_list[0]" << disk_speed_list.at(0) << " disk_speed_list[1]:" <<disk_speed_list.at(1);
         int m, n;
         if (disk_num == 16){
             m = (i%4)*2;
@@ -214,29 +268,34 @@ void Widget::on_pushButton_8_clicked()
             n = (i%4)*2 + 1;
         }
 
-
         QString read_speed="读：" + disk_speed_list.at(0);
         QString write_speed="写：" + disk_speed_list.at(1);
         ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(read_speed));
         ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem(write_speed));
         ui->pushButton_8->setText("测试：" + QString::number(i+1));
+
+        if (disk_speed_list.at(0).toInt() > DISK_MIN_READ && disk_speed_list.at(1).toInt() < DISK_MIN_WRITE) {
+            ui->tableWidget_2->item(m, n-1)->setBackgroundColor(Qt::green);
+        } else {
+            ui->tableWidget_2->item(m, n-1)->setBackgroundColor(Qt::red);
+        }
         qApp->processEvents();
     }
     ui->lineEdit_2->setText("测试完成");
-    ui->pushButton_8->setEnabled(true);
+
 }
 
 void Widget::on_radioButton_clicked()
 {
     QString cmd;
-    cmd = "sysled_test on";
+    cmd = "jw-aging sysled_test on";
     bash_cmd(cmd);
 }
 
 void Widget::on_radioButton_2_clicked()
 {
     QString cmd;
-    cmd = "sysled_test off";
+    cmd = "jw-aging sysled_test off";
     bash_cmd(cmd);
 
 }
@@ -244,28 +303,51 @@ void Widget::on_radioButton_2_clicked()
 void Widget::on_radioButton_3_clicked()
 {
     QString cmd;
-    cmd = "diskled_test on";
+    cmd = "jw-aging diskled_test on";
     bash_cmd(cmd);
 }
 
 void Widget::on_radioButton_4_clicked()
 {
     QString cmd;
-    cmd = "diskled_test off";
+    cmd = "jw-aging diskled_test off";
     bash_cmd(cmd);
 }
 
 void Widget::on_radioButton_5_clicked()
 {
     QString cmd;
-    cmd = "buzzer_test on";
+    cmd = "jw-aging buzzer_test on";
     bash_cmd(cmd);
 }
 
 void Widget::on_radioButton_6_clicked()
 {
     QString cmd;
-    cmd = "buzzer_test off";
+    cmd = "jw-aging buzzer_test off";
     bash_cmd(cmd);
 
+}
+
+
+
+void Widget::on_pushButton_12_clicked()
+{
+    ui->pushButton_12->setDisabled(true);
+    QPalette pal = ui->lineEdit_3->palette();
+    pal.setColor(QPalette::Text, Qt::green);
+    ui->lineEdit_3->setPalette(pal);
+
+    ui->lineEdit_3->setText("正在测试");
+    QString cmd;
+    QString out;
+    int free;
+    cmd = "jw-aging free_mem";
+    out=bash_cmd(cmd);
+    free = out.toInt() - 100;
+
+    cmd = "xterm -T \"Memtester\" -e \"memtester " + QString::number(free) + " 1; read -p 'press any key to exit'\" &";
+    system(cmd.toLatin1());
+    ui->lineEdit_3->setText("测试完成");
+    ui->pushButton_12->setEnabled(true);
 }

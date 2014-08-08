@@ -1,0 +1,213 @@
+#!/bin/bash
+pmu_cal_result=0
+
+pmu_lineal_to_real()
+{
+	in_raw_value=$(echo $1 | awk '{print strtonum("0x"$0)}')
+	in_binary=$(echo "obase=2; $in_raw_value" | bc )
+	len=${#in_binary}
+	if [ $len -lt 11 ]; then
+		in_data=$in_binary
+		in_exp=0
+	else
+		start_pos=$((5+$len-16))
+		in_data=${in_binary:$start_pos:$len}
+		in_exp=${in_binary:0:$start_pos}
+	fi
+
+	((temp=$(printf "%s%s" "2#" "$in_data")))
+	in_data=$temp
+	((temp=$(printf "%s%s" "2#" "$in_exp")))
+	in_exp=$temp
+	
+
+	if [ "$in_exp" -ge "16" ]; then
+        	exp_temp=$((32-$in_exp))
+	        temp=$[2**$exp_temp]
+        	in_nominal=$(($in_data/$temp))
+	else
+        	temp=$[2**$in_exp]
+	        in_nominal=$(($in_data*$temp))
+	fi
+	
+	pmu_cal_result=$in_nominal
+} 
+
+SYS_6026B_T="1001"
+SYS_6026N_T="1002"
+SYS_6036B_T="1003"
+SYS_6036C_T="1004"
+SYS_6036Z_T="1005"
+SYS_6036C_S="1006"
+SYS_6036Z_S="1007"
+
+hw_type="unkown"
+
+product_name=`dmidecode -s baseboard-product-name 2>/dev/null`
+if [ "$product_name" = "$SYS_6026B_T" ]; then
+        hw_type="2U8-STANDARD"
+elif  [ "$product_name" = "$SYS_6026N_T" ]; then
+        hw_type="2U8-ATOM"
+elif  [ "$product_name" = "$SYS_6036B_T" ]; then
+        hw_type="3U16-SIMPLE"
+elif  [ "$product_name" = "$SYS_6036C_T" -o "$product_name" = "$SYS_6036Z_T" ]; then
+        hw_type="3U16-STANDARD"
+elif  [ "$product_name" = "$SYS_6036C_S" -o "$product_name" = "$SYS_6036Z_S" ]; then
+        hw_type="3U16-STANDARD-SAS"
+fi
+
+
+if [ "$hw_type" = "unknown" ]; then
+	exit 1
+fi
+
+
+
+
+
+while true
+do
+	if [ -f /sys/devices/platform/nct6106.656/temp20_input ]; then
+		cpu_temper=$(($(cat /opt/jw-conf/system/temp_cpu )/1000))
+		env_temper=$(($(cat /sys/devices/platform/nct6106.656/temp20_input)/1000))
+		case_temper=$(($(cat /sys/devices/platform/nct6106.656/temp18_input)/1000))
+		case_fan1_speed=$(($(cat /sys/devices/platform/nct6106.656/fan1_input)))
+		case_fan2_speed=$(($(cat /sys/devices/platform/nct6106.656/fan3_input)))
+	else
+		cpu_temper="unknown"
+		env_temper="unknown"
+		case_temper="unknown"
+		case_fan1_speed="unknown"
+		case_fan2_speed="unknown"
+	fi
+
+	if [ "$hw_type" = "3U16-STANDARD" ] || [ "$hw_type" = "3U16-STANDARD-SAS" ]; then
+		if [ -f /proc/smbus-power/module1 ]; then
+			power_above_info=$(cat /proc/smbus-power/module1)
+			power_below_info=$(cat /proc/smbus-power/module2)
+	
+			power_above_status=$(echo $power_above_info | awk '{print $1}')
+			power_above_vin=$(echo $power_above_info | awk '{print $2}')
+			power_above_vout=$(echo $power_above_info | awk '{print $3}')
+			power_above_fan_speed=$(echo $power_above_info | awk '{print $4}')
+			power_above_amb_temp=$(echo $power_above_info | awk '{print $5}')
+			power_above_hs_temp=$(echo $power_above_info | awk '{print $6}')
+		
+			power_below_status=$(echo $power_below_info | awk '{print $1}')
+			power_below_vin=$(echo $power_below_info | awk '{print $2}')
+			power_below_vout=$(echo $power_below_info | awk '{print $3}')
+			power_below_fan_speed=$(echo $power_below_info | awk '{print $4}')
+			power_below_amb_temp=$(echo $power_below_info | awk '{print $5}')
+			power_below_hs_temp=$(echo $power_below_info | awk '{print $6}')
+			
+			pmu_lineal_to_real $power_above_vin
+			power_above_vin_nominal=$pmu_cal_result
+		
+			pmu_lineal_to_real $power_below_vin
+			power_below_vin_nominal=$pmu_cal_result
+		
+			power_above_vout_value=$(echo $power_above_vout | awk '{print strtonum("0x"$0)}')
+			power_above_vout_in_binary=$(echo "obase=2; $power_above_vout_value" | bc )
+			len=${#power_above_vout_in_binary}
+			start_pos=0
+			power_above_vout_data=${power_above_vout_in_binary:$start_pos:$len}
+			power_above_vout_exp=23
+			((temp=$(printf "%s%s" "2#" "$power_above_vout_data")))
+			power_above_vout_data=$temp
+			if [ "$power_above_vout_exp" -ge "16" ]; then
+				exp_temp=$((32-$power_above_vout_exp))
+				temp=$[2**$exp_temp]
+				power_above_vout_nominal=$(($power_above_vout_data/$temp))
+			else
+				temp=$[2**$power_above_vout_exp]	
+				power_above_vout_nominal=$(($power_above_vout_data*$temp))
+			fi
+		
+			power_below_vout_value=$(echo $power_below_vout | awk '{print strtonum("0x"$0)}')
+			power_below_vout_in_binary=$(echo "obase=2; $power_below_vout_value" | bc )
+			len=${#power_below_vout_in_binary}
+			start_pos=0
+			power_below_vout_data=${power_below_vout_in_binary:$start_pos:$len}
+			power_below_vout_exp=23
+			((temp=$(printf "%s%s" "2#" "$power_below_vout_data")))
+			power_below_vout_data=$temp
+			if [ "$power_below_vout_exp" -ge "16" ]; then
+				exp_temp=$((32-$power_below_vout_exp))
+				temp=$[2**$exp_temp]
+				power_below_vout_nominal=$(($power_below_vout_data/$temp))
+			else
+				temp=$[2**$power_above_vout_exp]
+				power_below_vout_nominal=$(($power_below_vout_data*$temp))
+			fi
+		
+			pmu_lineal_to_real $power_above_fan_speed
+			power_above_fan_speed_nominal=$pmu_cal_result
+			pmu_lineal_to_real $power_below_fan_speed
+			power_below_fan_speed_nominal=$pmu_cal_result
+		
+			pmu_lineal_to_real $power_above_amb_temp
+			power_above_amb_temp_nominal=$pmu_cal_result
+			pmu_lineal_to_real $power_below_amb_temp
+			power_below_amb_temp_nominal=$pmu_cal_result
+		
+			pmu_lineal_to_real $power_above_hs_temp
+			power_above_hs_temp_nominal=$pmu_cal_result
+			pmu_lineal_to_real $power_below_hs_temp
+			power_below_hs_temp_nominal=$pmu_cal_result
+		else
+			power_above_vin_nominal="unknown"
+			power_above_vout_nominal="unknown"
+			power_above_fan_speed_nominal="unknown"
+			power_above_amb_temp_nominal="unknown"
+			power_above_hs_temp_nominal="unknown"
+
+			power_below_vin_nominal="unknown"
+			power_below_vout_nominal="unknown"
+			power_below_fan_speed_nominal="unknown"
+			power_below_amb_temp_nominal="unknown"
+			power_below_hs_temp_nominal="unknown"
+		
+		fi
+
+	else
+		power_above_vin_nominal="unknown"
+		power_above_vout_nominal="unknown"
+		power_above_fan_speed_nominal="unknown"
+		power_above_amb_temp_nominal="unknown"
+		power_above_hs_temp_nominal="unknown"
+
+		power_below_vin_nominal="unknown"
+		power_below_vout_nominal="unknown"
+		power_below_fan_speed_nominal="unknown"
+		power_below_amb_temp_nominal="unknown"
+		power_below_hs_temp_nominal="unknown"
+	
+	fi
+		
+	printf "============================================================================\n"
+
+	printf "\nPower Above Info\n"
+	printf "%015s%015s%015s%015s%015s\n" "vin" "vout" "fan_speed" "amb_temp" "hs_temp" 
+	printf "%015s%015s%015s%015s%015s\n" $power_above_vin_nominal $power_above_vout_nominal $power_above_fan_speed_nominal $power_above_amb_temp_nominal $power_above_hs_temp_nominal
+
+	printf "\nPower Below Info\n"
+	printf "%015s%015s%015s%015s%015s\n" "vin" "vout" "fan_speed" "amb_temp" "hs_temp"
+	printf "%015s%015s%015s%015s%015s\n" $power_below_vin_nominal $power_below_vout_nominal $power_below_fan_speed_nominal $power_below_amb_temp_nominal $power_below_hs_temp_nominal
+
+	printf "\nChassis Info\n"
+	printf "%015s%015s%015s%015s%015s\n" "cpu_temper" "env_temp" "case_temper" "chassis fan1" "chassis fan2"
+	printf "%015s%015s%015s%015s%015s\n" $cpu_temper $env_temper $case_temper $case_fan1_speed $case_fan2_speed
+	
+	printf "============================================================================\n"
+	
+	if [ "x$1" = "x" ]; then
+		break
+	fi
+	sleep $1
+done
+
+
+
+
+
+
