@@ -5,30 +5,45 @@
 #include <QProcess>
 #include <QTimer>
 #include <QPalette>
+#include <QThread>
+#include <QMessageBox>
+#include <unistd.h>
 
+#define  VERSION   0.2
 #define  DISK_MIN_READ  120
-#define DISK_MIN_WRITE  100
+#define  DISK_MIN_WRITE  100
 
 QString product_name;
 int eth_num;
 int disk_num;
 QTimer *mon_timer;
+QTimer *disk_timer;
+QTimer *mem_timer;
+QTimer *net_timer;
+QTimer *disk_speed_timer;
+QStringList disk_info_list;
+int aging_start=0;
+int net_start=0;
+int mem_start=0;
+int disk_start=0;
 
- QStringList disk_info_list;
+int disk_speed_now=0;
+
 QString bash_cmd(QString cmd)
 {
     QString cmd_bash = "bash -c \"" + cmd + "\"";
     QString out="";
     QProcess *process = new QProcess();
-    qDebug()<<"cmd:"<<cmd_bash;
+    //qDebug()<<"cmd:"<<cmd_bash;
     process->start(cmd_bash);
+
     process->waitForFinished(60000);
 
     out = process->readAllStandardOutput();
     if (out.endsWith("\n")) {
         out.replace((out.length()-1),1,"");
     }
-    qDebug()<<"out:"<<out;
+    //qDebug()<<"out:"<<out;
     return out;
 }
 
@@ -38,6 +53,10 @@ Widget::Widget(QWidget *parent) :
     ui(new Ui::Widget)
 {
     ui->setupUi(this);
+
+    QString cmd;
+    cmd = "net_init &";
+    bash_cmd(cmd);
 
     QPalette pal = ui->lineEdit->palette();
     pal.setColor(QPalette::Text,Qt::darkYellow);
@@ -51,15 +70,36 @@ Widget::Widget(QWidget *parent) :
     pal.setColor(QPalette::Text, Qt::darkYellow);
     ui->lineEdit_3->setPalette(pal);
 
+
     ui->lineEdit->setText("未启动");
     ui->lineEdit_2->setText("未启动");
     ui->lineEdit_3->setText("未启动");
 
+
+    pal = ui->lineEdit_9->palette();
+    pal.setColor(QPalette::Text,Qt::darkYellow);
+    ui->lineEdit_9->setPalette(pal);
+
+    pal = ui->lineEdit_10->palette();
+    pal.setColor(QPalette::Text, Qt::darkYellow);
+    ui->lineEdit_10->setPalette(pal);
+
+    pal = ui->lineEdit_11->palette();
+    pal.setColor(QPalette::Text, Qt::darkYellow);
+    ui->lineEdit_11->setPalette(pal);
+
+
+    ui->lineEdit_9->setText("未启动");
+    ui->lineEdit_10->setText("未启动");
+    ui->lineEdit_11->setText("未启动");
+
     ui->pushButton_8->setDisabled(true);
 
+    QString title="JW测试工具 " + QString::number(VERSION);
     setWindowState(Qt::WindowMaximized);
+    setWindowTitle(title);
 
-    QString cmd;
+
     mon_timer = new QTimer(this);
     if (!mon_timer->isActive()) {
         mon_timer->start(10*1000);
@@ -102,15 +142,20 @@ Widget::Widget(QWidget *parent) :
     cmd = "jw-aging fireware";
     ui->textEdit_6->setText(bash_cmd(cmd));
 
-	   
-    
-       
-    qDebug() << "eth_num:" << eth_num << "\ndisk_num:" << disk_num;
+
+
+
     ui->tableWidget->setColumnCount(eth_num);
     int i;
     for (i=0; i<eth_num; i++){
-	    QString name="eth" + QString::number(i);
-	    ui->tableWidget->setItem(0, i, new QTableWidgetItem(name));
+        QString name="eth" + QString::number(i);
+        ui->tableWidget->setItem(0, i, new QTableWidgetItem(name));
+    }
+
+    ui->tableWidget_4->setColumnCount(eth_num);
+    for (i=0; i<eth_num; i++){
+        QString name="eth" + QString::number(i);
+        ui->tableWidget_4->setItem(0, i, new QTableWidgetItem(name));
     }
 
 
@@ -145,10 +190,70 @@ Widget::Widget(QWidget *parent) :
         }
     }
 
+
+
+
+    if (disk_num == 16) {
+        ui->tableWidget_3->setRowCount(8);
+        ui->tableWidget_3->setColumnCount(8);
+
+        ui->tableWidget_3->setColumnWidth(0,50);
+        ui->tableWidget_3->setColumnWidth(2, 50);
+        ui->tableWidget_3->setColumnWidth(4, 50);
+        ui->tableWidget_3->setColumnWidth(6,50);
+        int j, m, n;
+
+        for (j=0, m=0; j<8; j+=2, m++) {
+
+        for (i=0, n=0; i<8; i+=2, n++) {
+            ui->tableWidget_3->setSpan(i, j, 2, 1);
+            ui->tableWidget_3->setItem(i, j, new QTableWidgetItem(QString::number(4*m + n + 1)));
+            }
+        }
+    } else if (disk_num == 8) {
+        ui->tableWidget_3->setRowCount(4);
+        ui->tableWidget_3->setColumnCount(8);
+        int j, m, n;
+
+        for (j=0, m=0; j<4; j+=2, m++) {
+            for (i=0, n=0; i<8; i+=2, n++) {
+                ui->tableWidget_3->setSpan(j,i, 2, 1);
+                ui->tableWidget_3->setItem(j, i, new QTableWidgetItem(QString::number(4*m + n +1)));
+            }
+
+        }
+    }
 }
 
 Widget::~Widget()
 {
+    QString cmd;
+    cmd = "killall iperf >/dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "killall net_init > /dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "killall nc > /dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "killall dd > /dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "killall memtester > /dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "killall .aging_* > /dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "jw-aging net_restory";
+    bash_cmd(cmd);
+
+    cmd = "rm -rf /tmp/old/* > /dev/null 2>&1";
+    bash_cmd(cmd);
+
+    cmd = "rm -rf /tmp/route > /dev/null 2>&1";
+    bash_cmd (cmd);
     delete ui;
 }
 
@@ -175,31 +280,81 @@ void Widget::mon_update()
 
 void Widget::on_pushButton_7_clicked()
 {
+    if(net_start==2) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("网络测试已经开始运行，请检查是否开启了老化测试！\n"),
+                                       QMessageBox::Ok );
+        return ;
+    } else  {
 
     QPalette pal = ui->lineEdit->palette();
     pal.setColor(QPalette::Text, Qt::green);
     ui->lineEdit->setPalette(pal);
-
     ui->lineEdit->setText("正在测试");
     ui->pushButton_7->setDisabled(true);
+    qApp->processEvents();
+
     int i;
     QString cmd;
     QString speed;
     QStringList speed_list;
-    cmd = "jw-aging net_speed_test_new";
+    net_start=1;
+    cmd = "jw-aging net_info";
     speed = bash_cmd(cmd);
     speed_list = speed.split("\n");
+    for (i=0; i<eth_num; i++) {
+        ui->tableWidget->setItem(1, i, new QTableWidgetItem(speed_list.at(i)));
+    }
+
+    cmd = "jw-aging net_speed_test_new";
+    speed = bash_cmd(cmd);
+    if (speed == "remote") {
+        QMessageBox::critical(this, tr("Error"),
+                              tr("网络测试已经由对测设备启动!\n"),
+                              QMessageBox::Ok);
+        QPalette pal = ui->lineEdit->palette();
+        pal.setColor(QPalette::Text,Qt::darkYellow);
+        ui->lineEdit->setPalette(pal);
+        ui->lineEdit->setText("未启动");
+        ui->pushButton_7->setEnabled(true);
+        net_start = 0;
+        return ;
+    }
+    if (speed == "Null") {
+        QMessageBox::critical(this, tr("Error"),
+                              tr("启动网络测试失败!\n"),
+                              QMessageBox::Ok);
+
+        QPalette pal = ui->lineEdit->palette();
+        pal.setColor(QPalette::Text,Qt::red);
+        ui->lineEdit->setPalette(pal);
+        ui->lineEdit->setText("启动失败");
+        ui->pushButton_7->setEnabled(true);
+        net_start = 0;
+        return;
+    }
+    speed_list = speed.split("\n");
     qApp->processEvents();
-    for (i=0; i<speed_list.length(); i++) {
-      ui->tableWidget->setItem(1, i, new QTableWidgetItem(speed_list.at(i)));
+    for (i=0; i<eth_num; i++) {
+      ui->tableWidget->setItem(2, i, new QTableWidgetItem(speed_list.at(i)));
     }
     qApp->processEvents();
     ui->lineEdit->setText("测试完成");
     ui->pushButton_7->setEnabled(true);
+    net_start = 0;
+    }
 }
 
 void Widget::on_pushButton_11_clicked()
 {
+
+    if(disk_start) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("磁盘测试已经开始运行，请检查是否开启了老化测试！\n"),
+                                       QMessageBox::Ok );
+        return ;
+    } else {
+    disk_start = 1;
     ui->pushButton_11->setDisabled(true);
 
     ui->tableWidget_2->clearContents();
@@ -213,7 +368,7 @@ void Widget::on_pushButton_11_clicked()
     disk_info = bash_cmd(cmd);
 
     disk_info_list = disk_info.split("\n");
-    for(i=0; i< disk_info_list.length(); i++) {
+    for(i=0; i< disk_num; i++) {
         int m, n;
         if (disk_num == 16) {
             m = (i%4)*2;
@@ -235,12 +390,19 @@ void Widget::on_pushButton_11_clicked()
     }
     ui->pushButton_8->setEnabled(true);
     ui->pushButton_11->setEnabled(true);
-
+    disk_start = 0;
+}
 }
 
 void Widget::on_pushButton_8_clicked()
 {
-
+    if(disk_start) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("磁盘测试已经开始运行，请检查是否开启了老化测试！\n"),
+                                       QMessageBox::Ok );
+        return ;
+    } else {
+       disk_start = 1;
      ui->pushButton_8->setDisabled(true);
      ui->pushButton_11->setDisabled(true);
     QPalette pal = ui->lineEdit_2->palette();
@@ -249,10 +411,7 @@ void Widget::on_pushButton_8_clicked()
 
     ui->lineEdit_2->setText("正在测试");
 
-    int i;
-    QString cmd;
-    QString disk_speed;
-    QStringList disk_speed_list;
+
    /*
     QString disk_info;
     QStringList disk_info_list;
@@ -266,44 +425,111 @@ void Widget::on_pushButton_8_clicked()
       //  qDebug() << "i" << i << ":" << disk_info_list.at(i) << "abc";
     */
 
-    for (i=0; i < disk_info_list.length(); i++) {
-         ui->pushButton_8->setText("测试：" + QString::number(i+1));
-         qApp->processEvents();
-        if (disk_info_list.at(i) == "Null" || disk_info_list.at(i) == "Bad") {
-            continue;
-        } else {
-            cmd = "jw-aging disk_test speed " + QString::number(i+1);
-            disk_speed=bash_cmd(cmd);
-        }
-       // qDebug() << "disk_speed:" <<disk_speed;
-        disk_speed_list = disk_speed.split(" ");
-        //qDebug() << "disk_speed_list[0]" << disk_speed_list.at(0) << " disk_speed_list[1]:" <<disk_speed_list.at(1);
-        int m, n;
-        if (disk_num == 16){
-            m = (i%4)*2;
-            n = (i/4)*2+1;
-        } else if (disk_num == 8) {
-            m = (i/4)*2;
-            n = (i%4)*2 + 1;
-        }
+    ui->tableWidget_2->setDisabled(true);
+    QString cmd = "jw-aging disk_test speed";
+    system(cmd.toLatin1());
 
-        QString read_speed="读：" + disk_speed_list.at(0);
-        QString write_speed="写：" + disk_speed_list.at(1);
-        ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(read_speed));
-        ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem(write_speed));
-
-
-        if (disk_speed_list.at(0).toInt() > DISK_MIN_READ  &&  disk_speed_list.at(1).toInt() > DISK_MIN_WRITE) {
-            ui->tableWidget_2->item(m, n-1)->setBackgroundColor(Qt::green);
-        } else {
-            ui->tableWidget_2->item(m, n-1)->setBackgroundColor(Qt::red);
-        }
-        qApp->processEvents();
+    disk_speed_timer = new QTimer(this);
+    if (!disk_speed_timer->isActive()) {
+        disk_speed_timer->start(20*1000);
     }
-    ui->pushButton_11->setEnabled(true);
-    ui->lineEdit_2->setText("测试完成");
+
+    connect(disk_speed_timer, SIGNAL(timeout()), this, SLOT(get_disk_speed()));
 
 }
+}
+
+void Widget::get_disk_speed()
+{
+
+
+    while (disk_speed_now < disk_num && disk_info_list.at(disk_speed_now) == "Null") {
+        int m, n;
+        if (disk_num == 16){
+            m = (disk_speed_now%4)*2;
+            n = (disk_speed_now/4)*2+1;
+        } else if (disk_num == 8) {
+            m = (disk_speed_now/4)*2;
+            n = (disk_speed_now%4)*2 + 1;
+        }
+        ui->tableWidget_2->setItem(m, n, new QTableWidgetItem("Null"));
+        ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem("Null"));
+        disk_speed_now++;
+    }
+    if (disk_speed_now >= disk_num) {
+        if(disk_speed_timer->isActive()) {
+            disk_speed_timer->stop();
+        }
+        disk_speed_now = 0;
+        ui->tableWidget_2->setEnabled(true);
+        ui->pushButton_8->setEnabled(true);
+        ui->pushButton_11->setEnabled(true);
+        ui->lineEdit_2->setText("测试完成");
+        disk_start = 0;
+        return ;
+    }
+
+    QString cmd = "jw-aging disk_test get_speed " + QString::number(disk_speed_now+1);
+    QString out = bash_cmd(cmd);
+    QStringList speed = out.split(" ");
+
+        int m, n;
+        if (disk_num == 16){
+            m = (disk_speed_now%4)*2;
+            n = (disk_speed_now/4)*2+1;
+        } else if (disk_num == 8) {
+            m = (disk_speed_now/4)*2;
+            n = (disk_speed_now%4)*2 + 1;
+        }
+
+        QString read_speed="读：" + speed.at(0);
+        QString write_speed="写：" + speed.at(1);
+
+
+        ui->tableWidget_2->setItem(m, n, new QTableWidgetItem(read_speed));
+        ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem(write_speed));
+        if (speed.at(0).toInt() < DISK_MIN_READ ) {
+             ui->tableWidget_2->item(m,n)->setBackgroundColor(Qt::red);
+        } else {
+             ui->tableWidget_2->item(m,n)->setBackgroundColor(Qt::green);
+        }
+
+        if (speed.at(1).toInt() < DISK_MIN_WRITE ) {
+             ui->tableWidget_2->item(m+1,n)->setBackgroundColor(Qt::red);
+        } else {
+             ui->tableWidget_2->item(m+1,n)->setBackgroundColor(Qt::green);
+        }
+        disk_speed_now++;
+
+        while (disk_speed_now < disk_num && disk_info_list.at(disk_speed_now) == "Null") {
+            int m, n;
+            if (disk_num == 16){
+                m = (disk_speed_now%4)*2;
+                n = (disk_speed_now/4)*2+1;
+            } else if (disk_num == 8) {
+                m = (disk_speed_now/4)*2;
+                n = (disk_speed_now%4)*2 + 1;
+            }
+            ui->tableWidget_2->setItem(m, n, new QTableWidgetItem("Null"));
+            ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem("Null"));
+            disk_speed_now++;
+        }
+        if (disk_speed_now >= disk_num) {
+            if(disk_speed_timer->isActive()) {
+                disk_speed_timer->stop();
+            }
+            disk_speed_now = 0;
+            ui->tableWidget_2->setEnabled(true);
+            ui->pushButton_8->setEnabled(true);
+            ui->pushButton_11->setEnabled(true);
+            ui->lineEdit_2->setText("测试完成");
+            disk_start = 0;
+            return ;
+        }
+
+        qApp->processEvents();
+}
+
 
 void Widget::on_radioButton_clicked()
 {
@@ -353,6 +579,13 @@ void Widget::on_radioButton_6_clicked()
 
 void Widget::on_pushButton_12_clicked()
 {
+    if (mem_start) {
+            QMessageBox::warning(this, tr("Warning"),
+                                           tr("内存测试已经开始运行，请检查是否开启了老化测试！\n"),
+                                           QMessageBox::Ok );
+            return ;
+    } else {
+        mem_start=1;
     ui->pushButton_12->setDisabled(true);
     QPalette pal = ui->lineEdit_3->palette();
     pal.setColor(QPalette::Text, Qt::green);
@@ -370,4 +603,240 @@ void Widget::on_pushButton_12_clicked()
     system(cmd.toLatin1());
     ui->lineEdit_3->setText("测试完成");
     ui->pushButton_12->setEnabled(true);
+    mem_start = 0;
+}
+}
+
+void Widget::on_tabWidget_currentChanged(int index)
+{
+    if (index == 1) {
+
+    }
+}
+
+void Widget::on_pushButton_19_clicked()
+{
+    ui->pushButton_19->setDisabled(true);
+    if (disk_start) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("磁盘老化测试启动失败，请检查是否开启了磁盘的功能测试！\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_19->setEnabled(true);
+        return ;
+    }
+    disk_start=2;
+    QString cmd = "jw-aging aging_io_start";
+    bash_cmd(cmd);
+    disk_timer = new QTimer(this);
+    if (!disk_timer->isActive()) {
+        disk_timer->start(30*1000);
+    }
+
+    connect(disk_timer, SIGNAL(timeout()), this, SLOT(get_disk_status()));
+    QPalette pal = ui->lineEdit_10->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_10->setPalette(pal);
+    ui->lineEdit_10->setText("0");
+}
+
+void Widget::on_pushButton_20_clicked()
+{
+    ui->pushButton_20->setDisabled(true);
+   if (disk_start != 2) {
+       QMessageBox::warning(this, tr("Warning"),
+                                      tr("未启动磁盘老化测试\n"),
+                                      QMessageBox::Ok );
+       ui->pushButton_20->setEnabled(true);
+       return ;
+   }
+
+    QString cmd = "jw-aging  aging_io_stop";
+    bash_cmd(cmd);
+
+    if (disk_timer->isActive()) {
+        disk_timer->stop();
+    }
+    disk_start=0;
+    QPalette pal = ui->lineEdit_10->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_10->setPalette(pal);
+    ui->lineEdit_10->setText("已经停止");
+
+    ui->pushButton_19->setEnabled(true);
+    ui->pushButton_20->setEnabled(true);
+
+}
+
+void Widget::on_pushButton_33_clicked()
+{
+    ui->pushButton_33->setDisabled(true);
+    if (net_start==1) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("网络老化测试启动失败，请检查是否开启了网络的功能测试！\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_33->setEnabled(true);
+        return ;
+    }
+    net_start = 2;
+    QString cmd = "jw-aging aging_net_start";
+    QString out;
+    out = bash_cmd(cmd);
+    if (out == "remote") {
+        QMessageBox::critical(this, tr("Error"),
+                              tr("网络测试已经由对测设备启动!\n"),
+                              QMessageBox::Ok);
+        ui->pushButton_33->setEnabled(true);
+        net_start = 0;
+        return ;
+    }
+    if (out == "Null") {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("网络老化测试启动失败！\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_33->setEnabled(true);
+        net_start = 0;
+        return ;
+    }
+    net_timer = new QTimer(this);
+    if (!net_timer->isActive()) {
+        net_timer->start(10*1000);
+    }
+
+    connect(net_timer, SIGNAL(timeout()), this, SLOT(get_net_status()));
+    QPalette pal = ui->lineEdit_9->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_9->setPalette(pal);
+    ui->lineEdit_9->setText("0");
+}
+
+void Widget::on_pushButton_34_clicked()
+{
+    ui->pushButton_34->setDisabled(true);
+    if (net_start != 2) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("未启动网络老化测试!\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_34->setEnabled(true);
+        return;
+    }
+    QString cmd = "jw-aging aging_net_stop";
+    bash_cmd(cmd);
+
+    if (net_timer->isActive()) {
+        net_timer->stop();
+    }
+    net_start=0;
+
+    QPalette pal = ui->lineEdit_9->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_9->setPalette(pal);
+    ui->lineEdit_9->setText("已经停止");
+
+
+    ui->pushButton_33->setEnabled(true);
+    ui->pushButton_34->setEnabled(true);
+}
+
+void Widget::on_pushButton_35_clicked()
+{
+    ui->pushButton_35->setDisabled(true);
+    if (mem_start) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("内存老化测试启动失败，请检查是否开启了内存的功能测试！\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_35->setEnabled(true);
+        return ;
+    }
+    mem_start=2;
+    QString cmd = "jw-aging aging_mem_start";
+    bash_cmd(cmd);
+    mem_timer = new QTimer(this);
+    if (!mem_timer->isActive()) {
+        mem_timer->start(10*1000);
+    }
+
+    connect(mem_timer, SIGNAL(timeout()), this, SLOT(get_mem_status()));
+    QPalette pal = ui->lineEdit_11->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_11->setPalette(pal);
+    ui->lineEdit_11->setText("0");
+}
+
+
+void Widget::on_pushButton_36_clicked()
+{
+    ui->pushButton_36->setDisabled(true);
+    if (mem_start != 2) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("未启动内存老化测试!\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_36->setEnabled(true);
+        return;
+    }
+    QString cmd = "jw-aging aging_mem_stop";
+    bash_cmd(cmd);
+    if (mem_timer->isActive()) {
+        mem_timer->stop();
+    }
+    mem_start=0;
+
+    QPalette pal = ui->lineEdit_11->palette();
+    pal.setColor(QPalette::Text,Qt::green);
+    ui->lineEdit_11->setPalette(pal);
+    ui->lineEdit_11->setText("已经停止");
+
+    ui->pushButton_35->setEnabled(true);
+    ui->pushButton_36->setEnabled(true);
+}
+
+
+void Widget::get_disk_status()
+{
+    QString cmd = "jw-aging aging_io_status";
+    QString out = bash_cmd(cmd);
+    QStringList out_list = out.split("\n");
+    for (int i=0; i<disk_num; i++) {
+        QStringList speed = out_list.at(i).split(" ");
+
+        int m, n;
+        if (disk_num == 16){
+            m = (i%4)*2;
+            n = (i/4)*2+1;
+        } else if (disk_num == 8) {
+            m = (i/4)*2;
+            n = (i%4)*2 + 1;
+        }
+
+        QString read_speed="读：" + speed.at(0);
+        QString write_speed="写：" + speed.at(1);
+        ui->tableWidget_3->setItem(m, n, new QTableWidgetItem(read_speed));
+        ui->tableWidget_3->setItem(m+1, n,new QTableWidgetItem(write_speed));
+
+        qApp->processEvents();
+    }
+    ui->lineEdit_10->setText(QString::number(ui->lineEdit_10->text().toInt() + 30));
+}
+
+
+void Widget::get_net_status()
+{
+    QString cmd = "jw-aging aging_net_status";
+    QString out = bash_cmd(cmd);
+    QStringList out_list = out.split("\n");
+    for (int i=0; i<eth_num && i < out_list.length(); i++) {
+        QStringList speed = out_list.at(i).split(" ");        
+
+        ui->tableWidget_4->setItem(1, i, new QTableWidgetItem(speed.at(0)));
+        ui->tableWidget_4->setItem(2, i,new QTableWidgetItem(speed.at(1)));
+        qApp->processEvents();
+    }
+ ui->lineEdit_9->setText(QString::number(ui->lineEdit_9->text().toInt() + 10));
+}
+void Widget::get_mem_status()
+{
+    QString cmd = "jw-aging aging_mem_status";
+    QString out = bash_cmd(cmd);
+    ui->lineEdit_6->setText(out);
+     ui->lineEdit_11->setText(QString::number(ui->lineEdit_11->text().toInt() + 10));
+
 }

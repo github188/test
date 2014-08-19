@@ -1,9 +1,35 @@
 #!/bin/sh
 eths=`ls /sys/class/net | grep -v lo`
 i=1
+if [ ! -d /tmp/old ];then
+	mkdir /tmp/old/
+fi
+for eth in $eths
+do
+	info=`ifconfig $eth|grep inet|grep -v inet6`
+	echo $info > /tmp/old/$eth
+done
+
+route=`route -n|grep ^0.0.0.0|awk '{print $2}'`
+if [ "x$route" != "x" ];then
+	echo $route > /tmp/route
+fi
+
 for eth in $eths
 do
 	ifconfig $eth 192.13.$i.1 netmask 255.255.255.0
 	i=$(($i+1))
 done
-iperf -s -l 100000 > /dev/null 2>&1 &
+iperf -s  > /dev/null 2>&1 &
+
+rm -rf /run/lock/jw-aging.lock > /dev/null 2>&1
+while true
+do
+	str=""
+	str=`nc -l -p 21700`
+	if [ x"$str" = "x1" ]; then
+		touch /run/lock/jw-aging.lock
+	elif [ x"$str" = "x2" ]; then
+		rm -rf /run/lock/jw-aging.lock
+	fi 
+done

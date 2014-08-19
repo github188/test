@@ -64,6 +64,7 @@ SYS_6036Z_S="1007"
 hw_type="unkown"
 
 product_name=`dmidecode -s baseboard-product-name 2>/dev/null`
+
 if [ "$product_name" = "$SYS_6026B_T" ]; then
 	hw_type="2U8-STANDARD"
 elif  [ "$product_name" = "$SYS_6026N_T" ]; then
