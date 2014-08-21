@@ -574,7 +574,7 @@ fan()
 	fan1_speed=`echo "$hwmon"|sed -n 13p|awk '{print $4}'`
 	fan2_speed=`echo "$hwmon"|sed -n 13p|awk '{print $5}'`
 		
-	echo -e "fan1:$fan1_speed rmp  fan2:$fan2_speed rpm"
+	echo -e "fan1:$fan1_speed rpm  fan2:$fan2_speed rpm"
 }
 power()
 {
