@@ -12,10 +12,12 @@
 #define  VERSION   0.2
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
+#define LOCKFILE "/run/lock/jw-aging.lock"
 
 QString product_name;
 int eth_num;
 int disk_num;
+QTimer *time_timer;
 QTimer *mon_timer;
 QTimer *disk_timer;
 QTimer *mem_timer;
@@ -27,7 +29,23 @@ int net_start=0;
 int mem_start=0;
 int disk_start=0;
 
+long disk_time = 0;
+long net_time = 0;
+long mem_time = 0;
+
 int disk_speed_now=0;
+
+QString time_tostr(int time)
+{
+    int hour = 0;
+    int min = 0;
+    int sec = 0;
+
+    hour = time / 3600;
+    min = (time  - 3600*hour) / 60;
+    sec = time - 3600*hour - 60*min;
+    return ""+QString::number(hour) + "小时" +QString::number(min)+"分钟"+QString::number(sec)+"秒";
+}
 
 QString bash_cmd(QString cmd)
 {
@@ -58,25 +76,7 @@ Widget::Widget(QWidget *parent) :
     cmd = "net_init &";
     bash_cmd(cmd);
 
-    QPalette pal = ui->lineEdit->palette();
-    pal.setColor(QPalette::Text,Qt::darkYellow);
-    ui->lineEdit->setPalette(pal);
-
-    pal = ui->lineEdit_2->palette();
-    pal.setColor(QPalette::Text, Qt::darkYellow);
-    ui->lineEdit_2->setPalette(pal);
-
-    pal = ui->lineEdit_3->palette();
-    pal.setColor(QPalette::Text, Qt::darkYellow);
-    ui->lineEdit_3->setPalette(pal);
-
-
-    ui->lineEdit->setText("未启动");
-    ui->lineEdit_2->setText("未启动");
-    ui->lineEdit_3->setText("未启动");
-
-
-    pal = ui->lineEdit_9->palette();
+    QPalette pal = ui->lineEdit_9->palette();
     pal.setColor(QPalette::Text,Qt::darkYellow);
     ui->lineEdit_9->setPalette(pal);
 
@@ -126,7 +126,13 @@ Widget::Widget(QWidget *parent) :
 	    eth_num=2;
 	    disk_num=16;
     } else {
-	    eth_num=0;
+
+        QMessageBox::critical(this, tr("error"),
+                                       tr("程序不支持当前设备的类型，请检测bios版本，程序即将退出..."),
+                                       QMessageBox::Ok );
+        exit(-1);
+
+        eth_num=0;
 	    disk_num=0;
     }
     
@@ -223,6 +229,14 @@ Widget::Widget(QWidget *parent) :
 
         }
     }
+
+    time_timer = new QTimer(this);
+    if (!time_timer->isActive()) {
+        time_timer->start(1*1000);
+    }
+
+    connect(time_timer, SIGNAL(timeout()), this, SLOT(time_update()));
+
 }
 
 Widget::~Widget()
@@ -257,6 +271,22 @@ Widget::~Widget()
     delete ui;
 }
 
+void Widget::time_update()
+{
+    if ( disk_start == 2) {
+        disk_time += 1;
+        ui->lineEdit_10->setText(time_tostr(disk_time));
+    }
+    if ( net_start == 2 || net_start == 3) {
+        net_time += 1;
+        ui->lineEdit_9->setText(time_tostr(net_time));
+    }
+    if ( mem_start == 2) {
+        mem_time += 1;
+        ui->lineEdit_11->setText(time_tostr(mem_time));
+    }
+    qApp->processEvents();
+}
 void Widget::mon_update()
 {
     QString cmd;
@@ -280,17 +310,14 @@ void Widget::mon_update()
 
 void Widget::on_pushButton_7_clicked()
 {
-    if(net_start==2) {
+    if(net_start==2 || net_start == 3) {
         QMessageBox::warning(this, tr("Warning"),
                                        tr("网络测试已经开始运行，请检查是否开启了老化测试！\n"),
                                        QMessageBox::Ok );
         return ;
     } else  {
 
-    QPalette pal = ui->lineEdit->palette();
-    pal.setColor(QPalette::Text, Qt::green);
-    ui->lineEdit->setPalette(pal);
-    ui->lineEdit->setText("正在测试");
+
     ui->pushButton_7->setDisabled(true);
     qApp->processEvents();
 
@@ -312,10 +339,7 @@ void Widget::on_pushButton_7_clicked()
         QMessageBox::critical(this, tr("Error"),
                               tr("网络测试已经由对测设备启动!\n"),
                               QMessageBox::Ok);
-        QPalette pal = ui->lineEdit->palette();
-        pal.setColor(QPalette::Text,Qt::darkYellow);
-        ui->lineEdit->setPalette(pal);
-        ui->lineEdit->setText("未启动");
+
         ui->pushButton_7->setEnabled(true);
         net_start = 0;
         return ;
@@ -325,10 +349,6 @@ void Widget::on_pushButton_7_clicked()
                               tr("启动网络测试失败!\n"),
                               QMessageBox::Ok);
 
-        QPalette pal = ui->lineEdit->palette();
-        pal.setColor(QPalette::Text,Qt::red);
-        ui->lineEdit->setPalette(pal);
-        ui->lineEdit->setText("启动失败");
         ui->pushButton_7->setEnabled(true);
         net_start = 0;
         return;
@@ -339,7 +359,7 @@ void Widget::on_pushButton_7_clicked()
       ui->tableWidget->setItem(2, i, new QTableWidgetItem(speed_list.at(i)));
     }
     qApp->processEvents();
-    ui->lineEdit->setText("测试完成");
+
     ui->pushButton_7->setEnabled(true);
     net_start = 0;
     }
@@ -405,11 +425,6 @@ void Widget::on_pushButton_8_clicked()
        disk_start = 1;
      ui->pushButton_8->setDisabled(true);
      ui->pushButton_11->setDisabled(true);
-    QPalette pal = ui->lineEdit_2->palette();
-    pal.setColor(QPalette::Text,Qt::green);
-    ui->lineEdit_2->setPalette(pal);
-
-    ui->lineEdit_2->setText("正在测试");
 
 
    /*
@@ -464,7 +479,7 @@ void Widget::get_disk_speed()
         ui->tableWidget_2->setEnabled(true);
         ui->pushButton_8->setEnabled(true);
         ui->pushButton_11->setEnabled(true);
-        ui->lineEdit_2->setText("测试完成");
+
         disk_start = 0;
         return ;
     }
@@ -522,7 +537,7 @@ void Widget::get_disk_speed()
             ui->tableWidget_2->setEnabled(true);
             ui->pushButton_8->setEnabled(true);
             ui->pushButton_11->setEnabled(true);
-            ui->lineEdit_2->setText("测试完成");
+
             disk_start = 0;
             return ;
         }
@@ -575,38 +590,6 @@ void Widget::on_radioButton_6_clicked()
 
 }
 
-
-
-void Widget::on_pushButton_12_clicked()
-{
-    if (mem_start) {
-            QMessageBox::warning(this, tr("Warning"),
-                                           tr("内存测试已经开始运行，请检查是否开启了老化测试！\n"),
-                                           QMessageBox::Ok );
-            return ;
-    } else {
-        mem_start=1;
-    ui->pushButton_12->setDisabled(true);
-    QPalette pal = ui->lineEdit_3->palette();
-    pal.setColor(QPalette::Text, Qt::green);
-    ui->lineEdit_3->setPalette(pal);
-
-    ui->lineEdit_3->setText("正在测试");
-    QString cmd;
-    QString out;
-    int free;
-    cmd = "jw-aging free_mem";
-    out=bash_cmd(cmd);
-    free = out.toInt() - 100;
-
-    cmd = "xterm -T \"Memtester\" -e \"memtester " + QString::number(free) + " 1; read -p 'press any key to exit'\" &";
-    system(cmd.toLatin1());
-    ui->lineEdit_3->setText("测试完成");
-    ui->pushButton_12->setEnabled(true);
-    mem_start = 0;
-}
-}
-
 void Widget::on_tabWidget_currentChanged(int index)
 {
     if (index == 1) {
@@ -636,7 +619,7 @@ void Widget::on_pushButton_19_clicked()
     QPalette pal = ui->lineEdit_10->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_10->setPalette(pal);
-    ui->lineEdit_10->setText("0");
+
 }
 
 void Widget::on_pushButton_20_clicked()
@@ -657,6 +640,7 @@ void Widget::on_pushButton_20_clicked()
         disk_timer->stop();
     }
     disk_start=0;
+    disk_time = 0;
     QPalette pal = ui->lineEdit_10->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_10->setPalette(pal);
@@ -670,6 +654,7 @@ void Widget::on_pushButton_20_clicked()
 void Widget::on_pushButton_33_clicked()
 {
     ui->pushButton_33->setDisabled(true);
+
     if (net_start==1) {
         QMessageBox::warning(this, tr("Warning"),
                                        tr("网络老化测试启动失败，请检查是否开启了网络的功能测试！\n"),
@@ -677,26 +662,36 @@ void Widget::on_pushButton_33_clicked()
         ui->pushButton_33->setEnabled(true);
         return ;
     }
-    net_start = 2;
+    qApp->processEvents();
+
     QString cmd = "jw-aging aging_net_start";
     QString out;
     out = bash_cmd(cmd);
-    if (out == "remote") {
-        QMessageBox::critical(this, tr("Error"),
-                              tr("网络测试已经由对测设备启动!\n"),
-                              QMessageBox::Ok);
-        ui->pushButton_33->setEnabled(true);
-        net_start = 0;
-        return ;
-    }
+
     if (out == "Null") {
         QMessageBox::warning(this, tr("Warning"),
                                        tr("网络老化测试启动失败！\n"),
                                        QMessageBox::Ok );
         ui->pushButton_33->setEnabled(true);
-        net_start = 0;
         return ;
     }
+
+    if (out == "remote") {
+        time_t t;
+        time(&t);
+        FILE *fp = NULL;
+        char buf[20];
+        if ( (fp = fopen(LOCKFILE, "r+")) != NULL) {
+           if(fgets(buf, sizeof(buf)-1, fp) != NULL) {
+               net_time = t - atol(buf);
+           }
+              fclose(fp);
+        }
+        net_start = 3;
+    } else {
+        net_start = 2;
+    }
+
     net_timer = new QTimer(this);
     if (!net_timer->isActive()) {
         net_timer->start(10*1000);
@@ -706,19 +701,28 @@ void Widget::on_pushButton_33_clicked()
     QPalette pal = ui->lineEdit_9->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_9->setPalette(pal);
-    ui->lineEdit_9->setText("0");
+
 }
 
 void Widget::on_pushButton_34_clicked()
 {
     ui->pushButton_34->setDisabled(true);
-    if (net_start != 2) {
+    if (net_start == 0 || net_start == 1) {
         QMessageBox::warning(this, tr("Warning"),
                                        tr("未启动网络老化测试!\n"),
                                        QMessageBox::Ok );
         ui->pushButton_34->setEnabled(true);
         return;
     }
+    if (net_start == 3) {
+        QMessageBox::warning(this, tr("Warning"),
+                                       tr("网络老化测试由对测设备启动，请在对测设备上关闭!\n"),
+                                       QMessageBox::Ok );
+        ui->pushButton_34->setEnabled(true);
+        ui->pushButton_33->setEnabled(true);
+        return;
+    }
+
     QString cmd = "jw-aging aging_net_stop";
     bash_cmd(cmd);
 
@@ -726,7 +730,7 @@ void Widget::on_pushButton_34_clicked()
         net_timer->stop();
     }
     net_start=0;
-
+    net_time = 0;
     QPalette pal = ui->lineEdit_9->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_9->setPalette(pal);
@@ -759,7 +763,7 @@ void Widget::on_pushButton_35_clicked()
     QPalette pal = ui->lineEdit_11->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_11->setPalette(pal);
-    ui->lineEdit_11->setText("0");
+
 }
 
 
@@ -779,7 +783,7 @@ void Widget::on_pushButton_36_clicked()
         mem_timer->stop();
     }
     mem_start=0;
-
+    mem_time = 0;
     QPalette pal = ui->lineEdit_11->palette();
     pal.setColor(QPalette::Text,Qt::green);
     ui->lineEdit_11->setPalette(pal);
@@ -814,7 +818,7 @@ void Widget::get_disk_status()
 
         qApp->processEvents();
     }
-    ui->lineEdit_10->setText(QString::number(ui->lineEdit_10->text().toInt() + 30));
+
 }
 
 
@@ -823,6 +827,7 @@ void Widget::get_net_status()
     QString cmd = "jw-aging aging_net_status";
     QString out = bash_cmd(cmd);
     QStringList out_list = out.split("\n");
+
     for (int i=0; i<eth_num && i < out_list.length(); i++) {
         QStringList speed = out_list.at(i).split(" ");        
 
@@ -830,13 +835,14 @@ void Widget::get_net_status()
         ui->tableWidget_4->setItem(2, i,new QTableWidgetItem(speed.at(1)));
         qApp->processEvents();
     }
- ui->lineEdit_9->setText(QString::number(ui->lineEdit_9->text().toInt() + 10));
+
 }
 void Widget::get_mem_status()
 {
     QString cmd = "jw-aging aging_mem_status";
     QString out = bash_cmd(cmd);
     ui->lineEdit_6->setText(out);
-     ui->lineEdit_11->setText(QString::number(ui->lineEdit_11->text().toInt() + 10));
+
+
 
 }

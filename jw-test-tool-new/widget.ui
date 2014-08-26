@@ -42,9 +42,9 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>0</y>
+            <y>-30</y>
             <width>1093</width>
-            <height>1224</height>
+            <height>1174</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -98,85 +98,6 @@
                    </size>
                   </property>
                  </spacer>
-                </item>
-               </layout>
-              </item>
-              <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_4">
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout">
-                  <item>
-                   <widget class="QLabel" name="label_2">
-                    <property name="enabled">
-                     <bool>true</bool>
-                    </property>
-                    <property name="text">
-                     <string>网络测试：</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>lineEdit</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QLineEdit" name="lineEdit">
-                    <property name="enabled">
-                     <bool>true</bool>
-                    </property>
-                    <property name="readOnly">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout_2">
-                  <item>
-                   <widget class="QLabel" name="label_3">
-                    <property name="text">
-                     <string>SATA测试：</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>lineEdit</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QLineEdit" name="lineEdit_2">
-                    <property name="enabled">
-                     <bool>true</bool>
-                    </property>
-                    <property name="readOnly">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout_3">
-                  <item>
-                   <widget class="QLabel" name="label_4">
-                    <property name="text">
-                     <string>内存测试：</string>
-                    </property>
-                    <property name="buddy">
-                     <cstring>lineEdit</cstring>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QLineEdit" name="lineEdit_3">
-                    <property name="enabled">
-                     <bool>true</bool>
-                    </property>
-                    <property name="readOnly">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
                 </item>
                </layout>
               </item>
@@ -740,7 +661,7 @@
              <property name="minimumSize">
               <size>
                <width>900</width>
-               <height>700</height>
+               <height>650</height>
               </size>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -1107,7 +1028,7 @@
                 <item>
                  <widget class="QPushButton" name="pushButton_7">
                   <property name="text">
-                   <string>启动网络测试</string>
+                   <string>检测网络</string>
                   </property>
                  </widget>
                 </item>
@@ -1233,7 +1154,7 @@
                   <item>
                    <widget class="QPushButton" name="pushButton_8">
                     <property name="text">
-                     <string>启动测试</string>
+                     <string>检测速率</string>
                     </property>
                    </widget>
                   </item>
@@ -1314,115 +1235,6 @@
                    </widget>
                   </item>
                  </layout>
-                </item>
-               </layout>
-              </item>
-              <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_49">
-                <item>
-                 <spacer name="horizontalSpacer_12">
-                  <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
-                   <size>
-                    <width>40</width>
-                    <height>20</height>
-                   </size>
-                  </property>
-                 </spacer>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="pushButton_12">
-                  <property name="text">
-                   <string>启动内存测试</string>
-                  </property>
-                 </widget>
-                </item>
-                <item>
-                 <spacer name="horizontalSpacer_13">
-                  <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
-                   <size>
-                    <width>40</width>
-                    <height>20</height>
-                   </size>
-                  </property>
-                 </spacer>
-                </item>
-               </layout>
-              </item>
-              <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_51">
-                <item>
-                 <spacer name="horizontalSpacer_14">
-                  <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
-                   <size>
-                    <width>40</width>
-                    <height>20</height>
-                   </size>
-                  </property>
-                 </spacer>
-                </item>
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout_50">
-                  <item>
-                   <widget class="QPushButton" name="pushButton_31">
-                    <property name="minimumSize">
-                     <size>
-                      <width>85</width>
-                      <height>27</height>
-                     </size>
-                    </property>
-                    <property name="maximumSize">
-                     <size>
-                      <width>85</width>
-                      <height>27</height>
-                     </size>
-                    </property>
-                    <property name="text">
-                     <string>通过</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QPushButton" name="pushButton_32">
-                    <property name="minimumSize">
-                     <size>
-                      <width>85</width>
-                      <height>27</height>
-                     </size>
-                    </property>
-                    <property name="maximumSize">
-                     <size>
-                      <width>85</width>
-                      <height>27</height>
-                     </size>
-                    </property>
-                    <property name="text">
-                     <string>失败</string>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-                <item>
-                 <spacer name="horizontalSpacer_15">
-                  <property name="orientation">
-                   <enum>Qt::Horizontal</enum>
-                  </property>
-                  <property name="sizeHint" stdset="0">
-                   <size>
-                    <width>40</width>
-                    <height>20</height>
-                   </size>
-                  </property>
-                 </spacer>
                 </item>
                </layout>
               </item>
@@ -1527,9 +1339,6 @@
                  <property name="text">
                   <string>网络老化测试：</string>
                  </property>
-                 <property name="buddy">
-                  <cstring>lineEdit</cstring>
-                 </property>
                 </widget>
                </item>
                <item>
@@ -1551,9 +1360,6 @@
                  <property name="text">
                   <string>SATA老化测试：</string>
                  </property>
-                 <property name="buddy">
-                  <cstring>lineEdit</cstring>
-                 </property>
                 </widget>
                </item>
                <item>
@@ -1574,9 +1380,6 @@
                 <widget class="QLabel" name="label_25">
                  <property name="text">
                   <string>内存老化测试：</string>
-                 </property>
-                 <property name="buddy">
-                  <cstring>lineEdit</cstring>
                  </property>
                 </widget>
                </item>

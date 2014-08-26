@@ -16,6 +16,7 @@ public:
     ~Widget();
 public slots:
     void mon_update();
+    void time_update();
     void get_disk_status();
     void get_net_status();
     void get_mem_status();
@@ -38,8 +39,6 @@ private slots:
     void on_radioButton_6_clicked();
 
     void on_pushButton_11_clicked();
-
-    void on_pushButton_12_clicked();
 
     void on_tabWidget_currentChanged(int index);
 

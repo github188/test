@@ -29,6 +29,7 @@ do
 	str=`nc -l -p 21700`
 	if [ x"$str" = "x1" ]; then
 		touch /run/lock/jw-aging.lock
+		echo `date +"%s"` > /run/lock/jw-aging.lock
 	elif [ x"$str" = "x2" ]; then
 		rm -rf /run/lock/jw-aging.lock
 	fi 

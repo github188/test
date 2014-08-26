@@ -1,7 +1,0 @@
-#!/bin/sh
-if [ "x$1" = "x" ]; then
-	echo -e "example: dev_slot2dev 1"
-fi
-slot=$1
-dev=`/usr/local/bin/disk --list|grep 0:$slot\"|awk -F , '{print $2}'|awk -F : '{print $2}'|tr -d \"`
-echo $dev
