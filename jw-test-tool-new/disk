@@ -81,23 +81,25 @@ if [ -f /tmp/.disk_list ]; then
 	rm -f /tmp/.disk_list
 fi
 touch /tmp/.disk_list
-
+sys_disk=`mount -l | grep " / "|awk '{print $1}'|awk -F \/ '{print $3}'|tr -d [:digit:]`
 ls -l /sys/block | while read line
 do
 	#temp=$(echo $line | grep 'ata[0-9]*/host[0-9]*/target.*/block/sd[a-z]*')
-	temp=$(echo $line |grep -v usb| grep '/host[0-9]*/target.*/block/sd[a-z]*')
+	temp=$(echo $line |grep -v usb | grep -v $sys_disk| grep '/host[0-9]*/target.*/block/sd[a-z]*')
 	if [ $? -eq 0 ]; then
-		ata_num=$(echo $temp | awk -F /host '{print $2}' | awk -F \/ '{print $1}')
-		ata_num=$(($ata_num+1))
-		if [ $ata_num -le 2 ]; then
-			continue
+		if [ "$hw_type" = "3U16-STANDARD-SAS" ]; then
+			ata_num=$(echo $temp | awk -F /target '{print $2}' | awk -F [:/] '{print $3}')
+			slot_num=$(($ata_num+1))
+		else
+			ata_num=$(echo $temp | awk -F /host '{print $2}' | awk -F \/ '{print $1}')
+			ata_num=$(($ata_num+1))
+			if [ $ata_num -le 2 ]; then
+				continue
+			fi
+			calculate_slot $ata_num $hw_type
 		fi
-		calculate_slot $ata_num $hw_type
-	
 		sdx_id=$(echo $temp | awk -F /block/ '{print $2}')
 		dev_name="/dev/$sdx_id"
-
-
 
 		echo "\"slot\"":"\"0:$slot_num\"",  "\"dev\"":"\"$dev_name\""  >> /tmp/.disk_list
 		

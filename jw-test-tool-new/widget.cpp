@@ -9,7 +9,7 @@
 #include <QMessageBox>
 #include <unistd.h>
 
-#define  VERSION   0.2
+#define  VERSION   0.3
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -73,8 +73,6 @@ Widget::Widget(QWidget *parent) :
     ui->setupUi(this);
 
     QString cmd;
-    cmd = "net_init &";
-    bash_cmd(cmd);
 
     QPalette pal = ui->lineEdit_9->palette();
     pal.setColor(QPalette::Text,Qt::darkYellow);
@@ -125,7 +123,13 @@ Widget::Widget(QWidget *parent) :
     } else if (product_name == "SYS-6036Z-T(3U-Z77)") {
 	    eth_num=2;
 	    disk_num=16;
-    } else {
+    } else if (product_name == "SYS-6036C-S(3U-C216)") {
+            eth_num=5;
+            disk_num=16;
+      } else if (product_name == "SYS-6036Z-S(3U-Z77)") {
+            eth_num=2;
+            disk_num=16;
+      } else {
 
         QMessageBox::critical(this, tr("error"),
                                        tr("程序不支持当前设备的类型，请检测bios版本，程序即将退出..."),
@@ -133,7 +137,7 @@ Widget::Widget(QWidget *parent) :
         exit(-1);
 
         eth_num=0;
-	    disk_num=0;
+        disk_num=0;                 
     }
     
     cmd = "jw-aging cpu_info";
@@ -149,7 +153,32 @@ Widget::Widget(QWidget *parent) :
     ui->textEdit_6->setText(bash_cmd(cmd));
 
 
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
+        QString raid_cmd = "init_raid init";
 
+        QMessageBox msgBox;
+        msgBox.setText("警告：在测试sas设备时， 可能会引起raid的丢失！");
+        msgBox.setInformativeText("请选择是否继续?");
+        msgBox.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
+        msgBox.setDefaultButton(QMessageBox::Ok);
+        int ret = msgBox.exec();
+        switch (ret) {
+          case QMessageBox::Ok:
+              // Save was clicked
+              bash_cmd(raid_cmd);
+              break;
+          case QMessageBox::Cancel:
+              // Cancel was clicked
+              exit (-1);
+              break;
+          default:
+              // should never be reached
+              break;
+        }
+      }
+
+    cmd = "net_init &";
+    bash_cmd(cmd);
 
     ui->tableWidget->setColumnCount(eth_num);
     int i;
@@ -242,6 +271,9 @@ Widget::Widget(QWidget *parent) :
 Widget::~Widget()
 {
     QString cmd;
+
+
+
     cmd = "killall iperf >/dev/null 2>&1";
     bash_cmd(cmd);
 
@@ -268,6 +300,11 @@ Widget::~Widget()
 
     cmd = "rm -rf /tmp/route > /dev/null 2>&1";
     bash_cmd (cmd);
+
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
+       cmd = "init_raid restore &";
+       bash_cmd(cmd);
+     }
     delete ui;
 }
 
@@ -374,6 +411,7 @@ void Widget::on_pushButton_11_clicked()
                                        QMessageBox::Ok );
         return ;
     } else {
+
     disk_start = 1;
     ui->pushButton_11->setDisabled(true);
 
@@ -388,7 +426,7 @@ void Widget::on_pushButton_11_clicked()
     disk_info = bash_cmd(cmd);
 
     disk_info_list = disk_info.split("\n");
-    for(i=0; i< disk_num; i++) {
+    for(i=0; i< disk_num && i < disk_info_list.length() ; i++) {
         int m, n;
         if (disk_num == 16) {
             m = (i%4)*2;
@@ -458,7 +496,7 @@ void Widget::get_disk_speed()
 {
 
 
-    while (disk_speed_now < disk_num && disk_info_list.at(disk_speed_now) == "Null") {
+    while (disk_speed_now < disk_num && disk_speed_now < disk_info_list.length() && disk_info_list.at(disk_speed_now) == "Null") {
         int m, n;
         if (disk_num == 16){
             m = (disk_speed_now%4)*2;
@@ -471,7 +509,7 @@ void Widget::get_disk_speed()
         ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem("Null"));
         disk_speed_now++;
     }
-    if (disk_speed_now >= disk_num) {
+    if (disk_speed_now >= disk_num || disk_speed_now >= disk_info_list.length()) {
         if(disk_speed_timer->isActive()) {
             disk_speed_timer->stop();
         }
@@ -516,7 +554,7 @@ void Widget::get_disk_speed()
         }
         disk_speed_now++;
 
-        while (disk_speed_now < disk_num && disk_info_list.at(disk_speed_now) == "Null") {
+        while (disk_speed_now < disk_num && disk_speed_now < disk_info_list.length() && disk_info_list.at(disk_speed_now) == "Null") {
             int m, n;
             if (disk_num == 16){
                 m = (disk_speed_now%4)*2;
@@ -529,7 +567,7 @@ void Widget::get_disk_speed()
             ui->tableWidget_2->setItem(m+1, n,new QTableWidgetItem("Null"));
             disk_speed_now++;
         }
-        if (disk_speed_now >= disk_num) {
+        if (disk_speed_now >= disk_num || disk_speed_now >= disk_info_list.length()) {
             if(disk_speed_timer->isActive()) {
                 disk_speed_timer->stop();
             }
@@ -556,7 +594,7 @@ void Widget::on_radioButton_clicked()
 void Widget::on_radioButton_2_clicked()
 {
     QString cmd;
-    cmd = "jw-aging sysled_test off";
+    cmd = "jw-aging sysled_test foff";
     bash_cmd(cmd);
 
 }
@@ -585,7 +623,7 @@ void Widget::on_radioButton_5_clicked()
 void Widget::on_radioButton_6_clicked()
 {
     QString cmd;
-    cmd = "jw-aging buzzer_test off";
+    cmd = "jw-aging buzzer_test foff";
     bash_cmd(cmd);
 
 }
@@ -799,7 +837,7 @@ void Widget::get_disk_status()
     QString cmd = "jw-aging aging_io_status";
     QString out = bash_cmd(cmd);
     QStringList out_list = out.split("\n");
-    for (int i=0; i<disk_num; i++) {
+    for (int i=0; i < disk_num && i < out_list.length(); i++) {
         QStringList speed = out_list.at(i).split(" ");
 
         int m, n;

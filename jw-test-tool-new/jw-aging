@@ -20,31 +20,43 @@ case $Product_num in
 		Product_name="SYS-6026B-T(2U-B75)"
 		Eth_num=2
 		Disk_num=8
-		Hwtype="2U-B75"
+		Hwtype="2U8-B75"
 		;;
 	"1002")
 		Product_name="SYS-6026N-T(2U-ATOM)"
 		Eth_num=2
 		Disk_num=8
-		Hwtype="2U-ATOM"
+		Hwtype="2U8-ATOM"
 		;;
 	"1003")
 		Product_name="SYS-6036B-T(3U-SIMPLE)"
 		Eth_num=2
 		Disk_num=16
-		Hwtype="3U-SIMPLE"
+		Hwtype="3U16-SIMPLE"
 		;;
 	"1004")
 		Product_name="SYS-6036C-T(3U-C216)"
 		Eth_num=5
 		Disk_num=16
-		Hwtype="3U-STANDARD"
+		Hwtype="3U16-STANDARD"
 		;;
 	"1005")
 		Product_name="SYS-6036Z-T(3U-Z77)"
 		Eth_num=2
 		Disk_num=16
-		Hwtype="3U-STANDARD"
+		Hwtype="3U16-STANDARD"
+		;;
+	"1006")
+		Product_name="SYS-6036C-S(3U-C216)"
+		Eth_num=5
+		Disk_num=16
+		Hwtype="3U16-STANDARD-SAS"
+		;;
+	"1007")
+		Product_name="SYS-6036Z-S(3U-Z77)"
+		Eth_num=2
+		Disk_num=16
+		Hwtype="3U16-STANDARD-SAS"
 		;;
 	*)
 		Product_name="Unknown"
@@ -204,30 +216,81 @@ disk_test()
 {
 if [ "x$1" = "xinfo" ];then
 disks=`disk --list`
-for ((i=1; i<=$Disk_num; i++))
-do
-	slot_info=`echo "$disks"|grep "0:$i\""`
-	if [ -n "$slot_info" ]; then
-		slot_dev=`echo $slot_info|awk '{print $2}'|awk -F : '{print $2}'|tr -d "\""`
-		slot_dev_true=`echo $slot_dev|awk -F / '{print $3}'|tr -d "\""`
+	if [ "$Hwtype" = "3U16-STANDARD-SAS" ]; then
+		echo "$disks"| while read disk
+		do
+			slot_dev_true=`echo "$disk"|awk -F \/ '{print $3}'|tr -d \"`
+		
+			if `dd if=/dev/$slot_dev_true of=/dev/null bs=1M count=1 >/dev/null 2>&1` && `dd if=/dev/zero of=/dev/$slot_dev_true bs=1M count=1 > /dev/null 2>&1`; then	
+				echo -e "$slot_dev_true"
+			else
+				echo -e "Bad"
+			fi
+
+		done
+	else 
+		for ((i=1; i<=$Disk_num; i++))
+		do
+			slot_info=`echo "$disks"|grep "0:$i\""`
+			if [ -n "$slot_info" ]; then
+				slot_dev=`echo $slot_info|awk '{print $2}'|awk -F : '{print $2}'|tr -d "\""`
+				slot_dev_true=`echo $slot_dev|awk -F / '{print $3}'|tr -d "\""`
 			
-		if `dd if=/dev/$slot_dev_true of=/dev/null bs=4k count=1 >/dev/null 2>&1` && `dd if=/dev/zero of=/dev/$slot_dev_true bs=4k count=1 > /dev/null 2>&1`; then	
-			echo -e "$slot_dev_true"
-		else
-			echo -e "Bad"
-		fi
+				if `dd if=/dev/$slot_dev_true of=/dev/null bs=1M count=1 >/dev/null 2>&1` && `dd if=/dev/zero of=/dev/$slot_dev_true bs=1M count=1 > /dev/null 2>&1`; then	
+					echo -e "$slot_dev_true"
+				else
+					echo -e "Bad"
+				fi
 
-	else		
-			echo -e  "Null"
+			else		
+				echo -e  "Null"
+			fi
+		done
 	fi
-done
 fi
-
 if [ "x$1" = "xspeed" ];then
 		killall dd > /dev/null 2>&1
 		sync
 		
 		file=/tmp/disk_speed.sh
+	
+if [ "$Hwtype" = "3U16-STANDARD-SAS" ]; then
+		cat <<EOF >$file
+#!/bin/bash
+rm -rf /tmp/dd
+rm -rf /tmp/disk_speed
+disks=\`disk\`
+echo "\$disks"| while read disk
+do
+	dev=\`echo \$disk|awk -F : '{print \$4}'|tr -d \\"\`
+	if [ "x\$dev" = "x" ];then
+		echo -e "Null Null" >> /tmp/disk_speed
+		continue
+	else
+		sleep 2
+		dd if=\$dev of=/dev/null bs=4096 > /dev/null 2>&1 &  
+	fi
+
+	iostat -m  3 2 > $dd_tmp  2>&1 &
+	sleep 7
+	killall  dd >/dev/null 2>&1 
+
+	dev_base=\`basename \$dev\`
+	disk_read_speed=\`cat $dd_tmp | grep \$dev_base|sed -n 2p|awk '{print \$3}'|awk -F . '{print \$1}'\`
+
+	sleep 2
+	dd if=/dev/zero of=\$dev bs=4096 > /dev/null 2>&1 &
+
+	iostat -m  3 2 > $dd_tmp  2>&1 &
+	sleep 7
+	killall dd >/dev/null 2>&1
+
+	disk_write_speed=\`cat $dd_tmp | grep \${dev_base}|sed -n 2p|awk '{print \$4}'|awk -F . '{print \$1}'\`
+	echo  "\$disk_read_speed \$disk_write_speed" >> /tmp/disk_speed
+done
+EOF
+
+else
 		cat <<EOF >$file
 #!/bin/bash
 rm -rf /tmp/dd
@@ -262,6 +325,7 @@ do
 	echo  "\$disk_read_speed \$disk_write_speed" >> /tmp/disk_speed
 done
 EOF
+fi
 	chmod +x $file
 	$file &
 fi
@@ -443,16 +507,28 @@ status_aging_test()
 	if [ x"$1" = "xio" ]; then
 		echo -ne "" > /tmp/disk_aging
 		iostat -d -m 1 2 > /tmp/iostat 2>/dev/null
-		for ((i=1; i<=$Disk_num; i++)) 
-		do
-			dev=`echo "$disks"|grep "0:$i\""|awk -F , '{print $2}'|tr -d "\""|awk -F : '{print $2}'`
-			if [ "x$dev" = "x" ]; then
-				echo "0 0" >> /tmp/disk_aging
-				continue
-			fi
-			dev=`basename $dev`
-			cat /tmp/iostat|grep $dev|sed -n 2p|awk '{printf("%d %d\n", $3, $4)}' >> /tmp/disk_aging
-		done
+		if [ "$Hwtype" = "3U16-STANDARD-SAS" ]; then
+			echo "$disks"| while read disk
+			do
+				dev=`echo "$disk"|awk -F \/ '{print $3}'|tr -d \"`
+				if [ "x$dev" = "x" ]; then
+					echo "0 0" >> /tmp/disk_aging
+					continue
+				fi
+				cat /tmp/iostat|grep $dev|sed -n 2p|awk '{printf("%d %d\n", $3, $4)}' >> /tmp/disk_aging
+			done
+		else
+			for ((i=1; i<=$Disk_num; i++)) 
+			do
+				dev=`echo "$disks"|grep "0:$i\""|awk -F , '{print $2}'|tr -d "\""|awk -F : '{print $2}'`
+				if [ "x$dev" = "x" ]; then
+					echo "0 0" >> /tmp/disk_aging
+					continue
+				fi
+				dev=`basename $dev`
+				cat /tmp/iostat|grep $dev|sed -n 2p|awk '{printf("%d %d\n", $3, $4)}' >> /tmp/disk_aging
+			done
+		fi
 		cat /tmp/disk_aging
 	elif [ x"$1" = "xnet" ]; then
 		sar -n DEV 1 1 > /tmp/net_aging 2>&1
