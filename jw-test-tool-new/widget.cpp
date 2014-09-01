@@ -157,6 +157,7 @@ Widget::Widget(QWidget *parent) :
         QString raid_cmd = "init_raid init";
 
         QMessageBox msgBox;
+        msgBox.setWindowTitle("警告");
         msgBox.setText("警告：在测试sas设备时， 可能会引起raid的丢失！");
         msgBox.setInformativeText("请选择是否继续?");
         msgBox.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
@@ -412,6 +413,7 @@ void Widget::on_pushButton_11_clicked()
         return ;
     } else {
 
+
     disk_start = 1;
     ui->pushButton_11->setDisabled(true);
 
@@ -421,6 +423,20 @@ void Widget::on_pushButton_11_clicked()
     QString cmd;
     QString disk_info;
 
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
+          cmd = "jw-aging get_raid";
+          QString raid_info = bash_cmd(cmd);
+          if (raid_info == "Null") {
+              QMessageBox::warning(this, tr("Warning"),
+                                             tr("没有检测到raid卡！\n"),
+                                             QMessageBox::Ok );
+
+              ui->pushButton_11->setEnabled(true);
+              disk_start = 0;
+              return;
+            }
+
+     }
 
     cmd = "jw-aging disk_test info";
     disk_info = bash_cmd(cmd);
@@ -645,8 +661,25 @@ void Widget::on_pushButton_19_clicked()
         ui->pushButton_19->setEnabled(true);
         return ;
     }
+
     disk_start=2;
-    QString cmd = "jw-aging aging_io_start";
+    QString cmd;
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
+          cmd = "jw-aging get_raid";
+          QString raid_info = bash_cmd(cmd);
+          if (raid_info == "Null") {
+              QMessageBox::warning(this, tr("Warning"),
+                                             tr("没有检测到raid卡！\n"),
+                                             QMessageBox::Ok );
+
+              ui->pushButton_19->setEnabled(true);
+              disk_start = 0;
+              return;
+            }
+
+     }
+
+    cmd = "jw-aging aging_io_start";
     bash_cmd(cmd);
     disk_timer = new QTimer(this);
     if (!disk_timer->isActive()) {

@@ -1,42 +1,39 @@
 #!/bin/bash
 
 if [ "$1" = "init" ]; then
-	if `/opt/cmdline/arcconf GETVERSION > /dev/null 2>/dev/null` ; then
+	if ! /opt/mega/MegaCli64 -adpCount -nolog > /dev/null 2>&1; then
+		/opt/mega/MegaCli64 -CfgSave -f /tmp/raid_saved -a0 -nolog
+		/opt/mega/MegaCli64 -CfgClr -Force -aALL -nolog 
+		slots=`/opt/mega/MegaCli64 -PDList -aALL -nolog|grep -i slot|awk -F : '{print $2}'|tr -d " "`
+		for i in $slots
+		do
+			/opt/mega/MegaCli64 -CfgLdAdd -r0[16:$i] WB -a0 -nolog > /dev/null 2>&1
+		done
+	else
+#	if  /opt/cmdline/arcconf GETSTATUS 1 > /dev/null 2>&1 ; then
 		yes | /opt/cmdline/arcconf DELETE 1 JBOD ALL  > /dev/null
 		yes | /opt/cmdline/arcconf DELETE 1 LOGICALDRIVE ALL > /dev/null
 		slot_num=`/opt/cmdline/arcconf GETCONFIG 1 PD|grep -i Channel,Device|wc -l`
 		slots=`/opt/cmdline/arcconf GETCONFIG 1 PD|grep -i Channel,Device|sed ${slot_num}d|awk -F [:\(] '{print $4}'|tr -d " " `
-		
 		for slot in $slots
 		do
 			/opt/cmdline/arcconf CREATE 1 JBOD $slot
 		done
-		#slots=(`/opt/cmdline/arcconf GETCONFIG 1 PD|grep -i Channel,Device|sed ${slot_num}d|awk -F [:\(] '{print $4}'|tr -d " " `)
-		#sizes=(`/opt/cmdline/arcconf GETCONFIG 1 PD|grep -i Total\ Size|awk -F : '{print $2}'|tr -d [:alpha:]|tr -d " "`)
-		#for ((i=0; i<${#slots[@]}; i++))
-		#do
-		#	echo "${slots[$i]}   ${sizes[$i]}" 
-		#done
 		
-		
-	else
-		/opt/mega/MegaCli64 -CfgSave -f /tmp/raid_saved -a0
-		/opt/mega/MegaCli64 -CfgClr -Force -aALL
-		slots=`/opt/mega/MegaCli64 -PDList -aALL|grep -i slot|awk -F : '{print $2}'|tr -d " "`
-		for i in $slots
-		do
-			/opt/mega/MegaCli64 -CfgLdAdd -r0[16:$i] WB -a0
-		done
 	fi
 elif [ "$1" = "restore" ];then
-	if /opt/cmdline/arcconf GETVERSION; then
-		/opt/cmdline/arcconf SETCONFIG 1 DEFAULT
-	else
+
+	if ! /opt/mega/MegaCli64 -adpCount -nolog> /dev/null 2>&1; then
 		if [ -e /tmp/raid_saved ] ;then
-			/opt/mega/MegaCli64 -CfgClr -Force -aALL
-			/opt/mega/MegaCli64 -CfgRestore -f /tmp/raid_saved -a0
+			/opt/mega/MegaCli64 -CfgClr -Force -aALL -nolog
+			/opt/mega/MegaCli64 -CfgRestore -f /tmp/raid_saved -a0 -nolog
 		else 
 			return -1
 		fi
+	else
+#	if  /opt/cmdline/arcconf GETSTATUS 1 > /dev/null 2>&1 ; then
+		/opt/cmdline/arcconf SETCONFIG 1 DEFAULT
+		
 	fi
+
 fi
