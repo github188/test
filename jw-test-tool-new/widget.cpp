@@ -9,7 +9,7 @@
 #include <QMessageBox>
 #include <unistd.h>
 
-#define  VERSION   0.3
+#define  VERSION   0.4
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -129,7 +129,10 @@ Widget::Widget(QWidget *parent) :
       } else if (product_name == "SYS-6036Z-S(3U-Z77)") {
             eth_num=2;
             disk_num=16;
-      } else {
+      }  else if (product_name == "CMS1100G2") {
+        eth_num = 2;
+        disk_num = 16;
+    } else {
 
         QMessageBox::critical(this, tr("error"),
                                        tr("程序不支持当前设备的类型，请检测bios版本，程序即将退出..."),
@@ -145,9 +148,6 @@ Widget::Widget(QWidget *parent) :
 
     cmd = "jw-aging memory_info";
     ui->textEdit->setText(bash_cmd(cmd));
-
-    cmd = "jw-aging eth_info";
-    ui->textEdit_2->setText(bash_cmd(cmd));
 
     cmd = "jw-aging fireware";
     ui->textEdit_6->setText(bash_cmd(cmd));
@@ -191,6 +191,7 @@ Widget::Widget(QWidget *parent) :
     ui->tableWidget_4->setColumnCount(eth_num);
     for (i=0; i<eth_num; i++){
         QString name="eth" + QString::number(i);
+        ui->tableWidget->setColumnWidth(i, 150);
         ui->tableWidget_4->setItem(0, i, new QTableWidgetItem(name));
     }
 
@@ -368,6 +369,13 @@ void Widget::on_pushButton_7_clicked()
     speed = bash_cmd(cmd);
     speed_list = speed.split("\n");
     for (i=0; i<eth_num; i++) {
+        ui->tableWidget->setItem(2, i, new QTableWidgetItem(speed_list.at(i)));
+    }
+
+    cmd = "jw-aging net_mac";
+    speed = bash_cmd(cmd);
+    speed_list = speed.split("\n");
+    for (i=0; i<eth_num; i++) {
         ui->tableWidget->setItem(1, i, new QTableWidgetItem(speed_list.at(i)));
     }
 
@@ -394,7 +402,7 @@ void Widget::on_pushButton_7_clicked()
     speed_list = speed.split("\n");
     qApp->processEvents();
     for (i=0; i<eth_num; i++) {
-      ui->tableWidget->setItem(2, i, new QTableWidgetItem(speed_list.at(i)));
+      ui->tableWidget->setItem(3, i, new QTableWidgetItem(speed_list.at(i)));
     }
     qApp->processEvents();
 
@@ -867,12 +875,27 @@ void Widget::on_pushButton_36_clicked()
 
 void Widget::get_disk_status()
 {
+    int i = 0;
     QString cmd = "jw-aging aging_io_status";
     QString out = bash_cmd(cmd);
     QStringList out_list = out.split("\n");
-    for (int i=0; i < disk_num && i < out_list.length(); i++) {
-        QStringList speed = out_list.at(i).split(" ");
+    for (i=0; i < disk_num && i < out_list.length(); i++) {
 
+
+        if (out_list.at(i) == "Null Null") {
+            int m, n;
+            if (disk_num == 16) {
+                m = (i%4)*2;
+                n = (i/4)*2;
+            }else if (disk_num == 8) {
+                m = (i/4)*2;
+                n = (i%4)*2;
+            }
+
+           ui->tableWidget_3->item(m, n)->setBackgroundColor(Qt::gray);
+
+        } else {
+        QStringList speed = out_list.at(i).split(" ");
         int m, n;
         if (disk_num == 16){
             m = (i%4)*2;
@@ -881,12 +904,11 @@ void Widget::get_disk_status()
             m = (i/4)*2;
             n = (i%4)*2 + 1;
         }
-
         QString read_speed="读：" + speed.at(0);
         QString write_speed="写：" + speed.at(1);
         ui->tableWidget_3->setItem(m, n, new QTableWidgetItem(read_speed));
         ui->tableWidget_3->setItem(m+1, n,new QTableWidgetItem(write_speed));
-
+        }
         qApp->processEvents();
     }
 

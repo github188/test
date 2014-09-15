@@ -58,6 +58,12 @@ case $Product_num in
 		Disk_num=16
 		Hwtype="3U16-STANDARD-SAS"
 		;;
+	"1011")
+		Product_name="CMS1100G2"
+		Eth_num=2
+		Disk_num=16
+		Hwtype="haswell"
+		;;
 	*)
 		Product_name="Unknown"
 		Eth_num=0
@@ -230,6 +236,10 @@ disks=`disk --list`
 				echo -e "Bad"
 			fi
 
+		done
+		for ((i=1; i<=$Disk_num; i++))
+		do
+			echo -e "Null"
 		done
 	else 
 		for ((i=1; i<=$Disk_num; i++))
@@ -511,8 +521,10 @@ status_aging_test()
 		echo -ne "" > /tmp/disk_aging
 		iostat -d -m 1 2 > /tmp/iostat 2>/dev/null
 		if [ "$Hwtype" = "3U16-STANDARD-SAS" ]; then
+			i=0
 			echo "$disks"| while read disk
 			do
+				i=$((i+1))
 				dev=`echo "$disk"|awk -F \/ '{print $3}'|tr -d \"`
 				if [ "x$dev" = "x" ]; then
 					echo "Null Null" >> /tmp/disk_aging
@@ -520,12 +532,18 @@ status_aging_test()
 				fi
 				cat /tmp/iostat|grep $dev|sed -n 2p|awk '{printf("%d %d\n", $3, $4)}' >> /tmp/disk_aging
 			done
+			i=$i
+			while [ $i -le $Disk_num ]
+			do
+				echo "Null Null" >> /tmp/disk_aging
+				i=$((i+1))
+			done
 		else
 			for ((i=1; i<=$Disk_num; i++)) 
 			do
 				dev=`echo "$disks"|grep "0:$i\""|awk -F , '{print $2}'|tr -d "\""|awk -F : '{print $2}'`
 				if [ "x$dev" = "x" ]; then
-					echo "0 0" >> /tmp/disk_aging
+					echo "Null Null" >> /tmp/disk_aging
 					continue
 				fi
 				dev=`basename $dev`
@@ -572,7 +590,7 @@ stop_aging_test()
 		echo "2"|nc 192.13.1.$remote_net 21700
 		rm -rf /tmp/.aging_net_eth* >/dev/null 2>&1
 	elif [ x"$1" = "xmem" ];then 
-		pid = `ps aux|grep ".aging_mem"|grep -v grep |grep -v jw-aging|akw '{print $2}'`
+		pid = `ps aux|grep ".aging_mem"|grep -v grep |grep -v jw-aging|awk '{print $2}'`
 		kill -9 $pid > /dev/null 2>&1
 		killall memtester
 		rm -rf /tmp/.aging_mem > /dev/null 2>&1
@@ -775,6 +793,11 @@ get_raid()
 		echo 'Null'
 	fi
 }
+net_mac()
+{
+	mac_info=`ip addr|grep ether|awk '{print $2}'`
+	echo "$mac_info"
+}
 case $1 in 
 "ip_address")
 	get_ip
@@ -871,5 +894,8 @@ case $1 in
 	;;
 "get_raid")
 	get_raid
+	;;
+"net_mac")
+	net_mac
 	;;
 esac

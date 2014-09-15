@@ -42,9 +42,9 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-652</y>
-            <width>1093</width>
-            <height>1174</height>
+            <y>-411</y>
+            <width>1090</width>
+            <height>1074</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_4">
@@ -52,8 +52,8 @@
             <widget class="QWidget" name="widget" native="true">
              <property name="minimumSize">
               <size>
-               <width>900</width>
-               <height>500</height>
+               <width>950</width>
+               <height>400</height>
               </size>
              </property>
              <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -386,58 +386,6 @@
                </layout>
               </item>
               <item>
-               <layout class="QHBoxLayout" name="horizontalLayout_21">
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout_22">
-                  <item>
-                   <widget class="QLabel" name="label_11">
-                    <property name="text">
-                     <string>网络接口：</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QTextEdit" name="textEdit_2">
-                    <property name="readOnly">
-                     <bool>true</bool>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-                <item>
-                 <layout class="QHBoxLayout" name="horizontalLayout_23">
-                  <item>
-                   <widget class="QPushButton" name="pushButton_9">
-                    <property name="minimumSize">
-                     <size>
-                      <width>85</width>
-                      <height>27</height>
-                     </size>
-                    </property>
-                    <property name="text">
-                     <string>正确</string>
-                    </property>
-                   </widget>
-                  </item>
-                  <item>
-                   <widget class="QPushButton" name="pushButton_10">
-                    <property name="maximumSize">
-                     <size>
-                      <width>85</width>
-                      <height>27</height>
-                     </size>
-                    </property>
-                    <property name="text">
-                     <string>错误</string>
-                    </property>
-                   </widget>
-                  </item>
-                 </layout>
-                </item>
-               </layout>
-              </item>
-              <item>
                <layout class="QHBoxLayout" name="horizontalLayout_27">
                 <item>
                  <layout class="QHBoxLayout" name="horizontalLayout_28">
@@ -660,7 +608,7 @@
             <widget class="QWidget" name="widget_2" native="true">
              <property name="minimumSize">
               <size>
-               <width>900</width>
+               <width>950</width>
                <height>650</height>
               </size>
              </property>
@@ -1054,13 +1002,13 @@
                   <property name="minimumSize">
                    <size>
                     <width>0</width>
-                    <height>109</height>
+                    <height>130</height>
                    </size>
                   </property>
                   <property name="maximumSize">
                    <size>
                     <width>16777215</width>
-                    <height>109</height>
+                    <height>130</height>
                    </size>
                   </property>
                   <attribute name="horizontalHeaderVisible">
@@ -1069,6 +1017,11 @@
                   <row>
                    <property name="text">
                     <string>接口</string>
+                   </property>
+                  </row>
+                  <row>
+                   <property name="text">
+                    <string>MAC地址</string>
                    </property>
                   </row>
                   <row>
@@ -1262,8 +1215,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1093</width>
-            <height>668</height>
+            <width>1090</width>
+            <height>658</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout">
