@@ -9,7 +9,7 @@
 #include <QMessageBox>
 #include <unistd.h>
 
-#define  VERSION   0.4
+#define  VERSION   0.5
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -181,6 +181,15 @@ Widget::Widget(QWidget *parent) :
     cmd = "net_init &";
     bash_cmd(cmd);
 
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)" || product_name == "CMS1100G2") {
+
+        ui->label_21->setHidden(true);
+        ui->radioButton_3->setHidden(true);
+        ui->radioButton_4->setHidden(true);
+        ui->pushButton_23->setHidden(true);
+        ui->pushButton_24->setHidden(true);
+    }
+
     ui->tableWidget->setColumnCount(eth_num);
     int i;
     for (i=0; i<eth_num; i++){
@@ -268,6 +277,8 @@ Widget::Widget(QWidget *parent) :
 
     connect(time_timer, SIGNAL(timeout()), this, SLOT(time_update()));
 
+    //禁用内存老化（暂时）
+    ui->pushButton_35->setDisabled(true);
 }
 
 Widget::~Widget()

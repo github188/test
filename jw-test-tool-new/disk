@@ -41,7 +41,7 @@ calculate_slot()
 		else
 			echo "ata_num:" $ata_num "does not exit"
 		fi
-	elif [ "$machine_type" = "3U16-STANDARD" ]; then
+	elif [ "$machine_type" = "3U16-STANDARD" -o "$machine_type" = "CMS1100G2" ]; then
 		if [ $ata_num -ge 7 ] || [ $ata_num -le 22 ]; then
 			slot_num=$(($ata_num-7+1))
 		fi
@@ -60,6 +60,7 @@ SYS_6036C_T="1004"
 SYS_6036Z_T="1005"
 SYS_6036C_S="1006"
 SYS_6036Z_S="1007"
+SYS_CMS1100G2="1011"
 
 hw_type="unkown"
 
@@ -75,6 +76,8 @@ elif  [ "$product_name" = "$SYS_6036C_T" -o "$product_name" = "$SYS_6036Z_T" ]; 
         hw_type="3U16-STANDARD"
 elif  [ "$product_name" = "$SYS_6036C_S" -o "$product_name" = "$SYS_6036Z_S" ]; then
         hw_type="3U16-STANDARD-SAS"
+elif  [ "$product_name" = "$SYS_CMS1100G2" ]; then
+	hw_type="CMS1100G2"
 fi
 
 if [ -f /tmp/.disk_list ]; then

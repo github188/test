@@ -42,8 +42,8 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-411</y>
-            <width>1090</width>
+            <y>0</y>
+            <width>1098</width>
             <height>1074</height>
            </rect>
           </property>
@@ -1214,9 +1214,9 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>0</y>
-            <width>1090</width>
-            <height>658</height>
+            <y>-233</y>
+            <width>1098</width>
+            <height>692</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout">
@@ -1525,12 +1525,12 @@
              </row>
              <row>
               <property name="text">
-               <string>发送速度(Mb/b)</string>
+               <string>发送速度(MB/s)</string>
               </property>
              </row>
              <row>
               <property name="text">
-               <string>接收速度(Mb/b)</string>
+               <string>接收速度(MB/s)</string>
               </property>
              </row>
             </widget>
@@ -1615,8 +1615,8 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup"/>
+  <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup_3"/>
  </buttongroups>
 </ui>
