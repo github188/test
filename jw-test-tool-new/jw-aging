@@ -461,33 +461,19 @@ if [ -e /run/lock/jw-aging.lock ]; then
 	echo -e "remote"
 	return
 fi
-	remote_net=0
-	for ((i=0; i<$Eth_num; i++))
-	do
-		ifconfig eth$i 192.13.$(($i+1)).3 netmask 255.255.255.0
-	done
 
-	ping -W 3 -c 2 192.13.1.1 > /dev/null 2>&1
+remote_net=0
+local_net=`ifconfig eth0 | grep inet|grep -v inet6|awk '{print $2}' | awk -F . '{print $4}'`
 
-	if [ $? -ne 0 ] ; then
-		ping -W 3 -c 2 192.13.1.2 > /dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo -e "Null"
-			return
-		else
-			remote_net=2
-			for ((i=0; i<$Eth_num; i++)) 
-			do
-				ifconfig eth$i 192.13.$(($i+1)).1 netmask 255.255.255.0
-			done
-		fi
-	else
-		remote_net=1
-		for ((i=0; i<$Eth_num; i++))
-		do
-			ifconfig eth$i 192.13.$(($i+1)).2 netmask 255.255.255.0
-		done	
-	fi
+if [ $local_net -eq 2 ];then
+	remote_net=1
+else 
+	remote_net=2
+fi
+if ! ping -W 3 -c 2 192.13.1.$remote_net > /dev/null 2>&1; then
+	echo -e "Null"
+	return
+fi
 
 echo "1"|nc 192.13.1.${remote_net} 21700
 pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
@@ -505,7 +491,7 @@ done
 #!/bin/bash
 while true
 do
-	iperf -c 192.13.$(($i+1)).$remote_net -d -t 3600 > /dev/null 2>&1  
+	iperf -c 192.13.$(($i+1)).$remote_net -p 50$((remote_net))$(($i+1)) -d -t 3600 > /dev/null 2>&1  
 done
 EOF
 	chmod +x $file
@@ -697,33 +683,20 @@ if [ -e /run/lock/jw-aging.lock ]; then
 	echo -e "remote"
 	return
 fi
-	remote_net=0
-	for ((i=0; i<$Eth_num; i++))
-	do
-		ifconfig eth$i 192.13.$(($i+1)).3 netmask 255.255.255.0
-	done
 
-	ping -W 3 -c 2 192.13.1.1 > /dev/null 2>&1
+remote_net=0
+local_net=`ifconfig eth0 | grep inet|grep -v inet6|awk '{print $2}' | awk -F . '{print $4}'`
 
-	if [ $? -ne 0 ] ; then
-		ping -W 3 -c 2 192.13.1.2 > /dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo -e "Null"
-			return
-		else
-			remote_net=2
-			for ((i=0; i<$Eth_num; i++)) 
-			do
-				ifconfig eth$i 192.13.$(($i+1)).1 netmask 255.255.255.0
-			done
-		fi
-	else
-		remote_net=1
-		for ((i=0; i<$Eth_num; i++))
-		do
-			ifconfig eth$i 192.13.$(($i+1)).2 netmask 255.255.255.0
-		done	
-	fi
+if [ $local_net -eq 2 ];then
+	remote_net=1
+else 
+	remote_net=2
+fi
+
+if ! ping -W 3 -c 2 192.13.1.$remote_net > /dev/null 2>&1; then
+	echo -e "Null"
+	return
+fi
 
 echo "1"|nc 192.13.1.${remote_net} 21700
 pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
@@ -739,7 +712,7 @@ done
 		file=/tmp/net_eth${i}_speed.sh
 cat <<EOF >$file
 #!/bin/bash
-	iperf -c 192.13.$((i+1)).$remote_net -d -t 15 > /dev/nll 2>&1  
+iperf -c 192.13.$((i+1)).$remote_net -p 50$((remote_net))$((i+1)) -d -t 15 > /dev/nll 2>&1  
 EOF
 	chmod +x $file
 	$file &

@@ -149,9 +149,16 @@ Widget::Widget(QWidget *parent) :
     cmd = "jw-aging memory_info";
     ui->textEdit->setText(bash_cmd(cmd));
 
+
     cmd = "jw-aging fireware";
     ui->textEdit_6->setText(bash_cmd(cmd));
 
+    if (product_name != "SYS-6036C-T(3U-C216)" && product_name != "SYS-6036Z-T(3U-Z77") {
+        ui->label_15->setHidden(true);
+        ui->textEdit_6->setHidden(true);
+        ui->pushButton_17->setHidden(true);
+        ui->pushButton_18->setHidden(true);
+    }
 
     if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
         QString raid_cmd = "init_raid init";
