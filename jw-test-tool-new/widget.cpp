@@ -9,7 +9,7 @@
 #include <QMessageBox>
 #include <unistd.h>
 
-#define  VERSION   0.5
+#define  VERSION   0.6
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -629,14 +629,22 @@ void Widget::get_disk_speed()
 void Widget::on_radioButton_clicked()
 {
     QString cmd;
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77") {
+        cmd = "sas_sysled on";
+    } else {
     cmd = "jw-aging sysled_test on";
+    }
     bash_cmd(cmd);
 }
 
 void Widget::on_radioButton_2_clicked()
 {
     QString cmd;
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77") {
+        cmd = "sas_sysled off";
+    } else {
     cmd = "jw-aging sysled_test foff";
+   }
     bash_cmd(cmd);
 
 }
