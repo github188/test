@@ -1,0 +1,16 @@
+disk_dev2slot脚本是用于获取/dev/sd*对应的磁盘所在的槽位号。
+disk_slot2dev脚本用于从槽位号获取相应的/dev/sd*的信息。
+这两个脚本在执行时，会调用disk脚本。
+
+具体命令使用方法：
+1、disk_dev2slot
+命令后带/dev/sd*参数，示例如下：
+disk_dev2slot /dev/sdb
+如果确有对应的盘在槽位中，那么输出对应的槽位号；如果盘不存在，则无输出。
+2、disk_slot2dev
+命令后带槽位号参数，示例如下：
+dev_slot2dev 1
+如果对应槽位确有磁盘存在，那么输出对应的/dev/sd*信息。
+
+注1：系统中需要安装dmidecode工具。
+注2：建议将脚本copy到系统路径下。
