@@ -9,7 +9,7 @@
 #include <QMessageBox>
 #include <unistd.h>
 
-#define  VERSION   0.5
+#define  VERSION   0.7
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -349,12 +349,65 @@ void Widget::mon_update()
     QString cmd;
     QString out;
     QStringList out_list;
-    cmd = "jw-aging fan";
+    cmd = "jw-aging fan1";
     out = bash_cmd(cmd);
-    ui->textEdit_4->setText(out);
-    cmd = "jw-aging power";
+    if (out.split("\n").at(1) == "false") {
+        ui->textEdit_4->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_4->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->textEdit_4->setPalette(pal);
+    } else {
+
+        ui->textEdit_4->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_4->palette();
+        pal.setColor(QPalette::Text, Qt::black);
+        ui->textEdit_4->setPalette(pal);
+    }
+    cmd = "jw-aging fan2";
     out = bash_cmd(cmd);
-    ui->textEdit_5->setText(out);
+    if (out.split("\n").at(1) == "false") {
+        ui->textEdit_7->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_7->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->textEdit_7->setPalette(pal);
+    } else {
+        ui->textEdit_7->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_7->palette();
+        pal.setColor(QPalette::Text, Qt::black);
+        ui->textEdit_7->setPalette(pal);
+    }
+
+
+
+    cmd = "jw-aging power1";
+    out = bash_cmd(cmd);
+    if (out.split("\n").at(1) == "false") {
+        ui->textEdit_8->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_8->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->textEdit_8->setPalette(pal);
+    } else {
+        ui->textEdit_8->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_8->palette();
+        pal.setColor(QPalette::Text, Qt::black);
+        ui->textEdit_8->setPalette(pal);
+    }
+
+
+    cmd = "jw-aging power2";
+    out = bash_cmd(cmd);
+    if (out.split("\n").at(1) == "false") {
+        ui->textEdit_9->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_9->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->textEdit_9->setPalette(pal);
+    } else {
+        ui->textEdit_9->setText(out.split("\n").at(0));
+        QPalette  pal = ui->textEdit_9->palette();
+        pal.setColor(QPalette::Text, Qt::black);
+        ui->textEdit_9->setPalette(pal);
+    }
+
     cmd = "jw-aging cpu";
     out = bash_cmd(cmd) + "%";
     ui->lineEdit_8->setText(out);
@@ -421,6 +474,12 @@ void Widget::on_pushButton_7_clicked()
     qApp->processEvents();
     for (i=0; i<eth_num; i++) {
       ui->tableWidget->setItem(3, i, new QTableWidgetItem(speed_list.at(i)));
+      if (speed_list.at(i).split("/").at(0).toInt() < 100 ||
+            speed_list.at(i).split("/").at(1).toInt() < 100) {
+          ui->tableWidget->item(3,i)->setBackground(Qt::red);
+      } else {
+          ui->tableWidget->item(3,i)->setBackground(Qt::white);
+      }
     }
     qApp->processEvents();
 
@@ -629,14 +688,22 @@ void Widget::get_disk_speed()
 void Widget::on_radioButton_clicked()
 {
     QString cmd;
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77") {
+        cmd = "sas_sysled on";
+    } else {
     cmd = "jw-aging sysled_test on";
+    }
     bash_cmd(cmd);
 }
 
 void Widget::on_radioButton_2_clicked()
 {
     QString cmd;
+    if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77") {
+        cmd = "sas_sysled off";
+    } else {
     cmd = "jw-aging sysled_test foff";
+   }
     bash_cmd(cmd);
 
 }
