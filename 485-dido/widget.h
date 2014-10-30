@@ -17,7 +17,7 @@ class Widget : public QWidget
 public:
     explicit Widget(QWidget *parent = 0);
     ~Widget();
-    void work(int, int);
+    int work(int, int);
 private slots:
     void on_pushButton_clicked();
 
@@ -40,6 +40,14 @@ private slots:
     void on_pushButton_12_clicked();
 
     void on_pushButton_3_clicked();
+
+    void on_pushButton_4_clicked();
+
+    void on_comboBox_currentIndexChanged(int index);
+
+    void on_pushButton_13_clicked();
+
+    void on_pushButton_14_clicked();
 
 private:
     Ui::Widget *ui;

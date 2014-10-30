@@ -7,11 +7,15 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <pthread.h>
 #include <QMessageBox>
 #include <QString>
+#include <sys/time.h>
+#include <string.h>
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,50 +23,64 @@ extern "C" {
 
 #include "./tdwy_io_board_api.h"
 
-#define VERSION "0.1"
-#define SERIAL_C "/dev/ttyS1"
-#define SERIAL_B "/dev/ttyS0"
+#define VERSION "0.3"
+#define SERIAL_C "/dev/ttyS0"
+#define SERIAL_B "/dev/ttyS1"
 #define USB "/dev/ttyUSB0"
-#define MAXSIZE 10240
+#define MSG "abcdefghijklmnopqrstuvwxyz\nABCDEFGHIJKLMNOPQRSTUVWXYZ\n1234567890"
+#define MAXSIZE 1024
+#define TIMEOUT 5
 
-static char buf[MAXSIZE];
-static struct termios saved_usb_termios;
+static char *COM =  "/dev/ttyS0";
 static uint8_t dido_in = 0xff;
 static uint16_t dido_out = 0x0;
 
-/*
-static int io_board_save_usb(void)
+
+struct msg {
+    size_t len;
+    char path[128];
+    char data[MAXSIZE];
+};
+
+static int io_board_init_c(const char *path)
 {
     int fd;
-    fd = open(USB, O_RDWR | O_NOCTTY | O_NDELAY);
+    struct termios newtio;
+    uint32_t status;
+
+    fd = open(path, O_RDWR | O_NOCTTY | O_NDELAY);
     if (fd < 0) {
         return -1;
     }
+    bzero (&newtio, sizeof(newtio));
+    newtio.c_cflag |= CLOCAL|CREAD;
+    newtio.c_cflag &= ~CSIZE;
+    newtio.c_cflag |= CS8;
+    newtio.c_cflag &= ~PARENB;
 
-    if (tcgetattr(fd, &saved_usb_termios) < 0) {
-        return -1;
-    }
-    close(fd);
-    return 0;
-}
+    cfsetispeed(&newtio, B115200);
+    cfsetospeed(&newtio, B115200);
 
-static int io_board_restore_usb(void)
-{
-    int fd;
-    fd = open(USB, O_RDWR | O_NOCTTY | O_NDELAY);
-    if (fd < 0) {
-        return -1;
-    }
+    newtio.c_cflag &= ~CSTOPB;
+    newtio.c_cc[VTIME] = 0;
+    newtio.c_cc[VMIN] =  1;
     tcflush(fd, TCIFLUSH);
-    if (tcsetattr(fd, TCSANOW, &saved_usb_termios) != 0) {
+
+    if (tcsetattr(fd, TCSANOW, &newtio) != 0) {
         return -1;
+    }
+
+    if (strcmp(path, SERIAL_C) == 0) {
+        ioctl ( fd, TIOCMGET, ( long unsigned int )&status );
+        status &= ~TIOCM_RTS;
+        //status |= TIOCM_RTS;
+        ioctl ( fd, TIOCMSET, ( long unsigned int )&status );
     }
     close(fd);
     return 0;
-
 }
-*/
-static int io_board_init(char *path)
+
+static int io_board_init(const char *path)
 {
     int fd;
     struct termios newtio;
@@ -92,8 +110,9 @@ static int io_board_init(char *path)
 }
 
 
-void Widget::work(int idx, int s)
+int Widget::work(int idx, int s)
 {
+    int ret = 0;
 
 
     if (s) {
@@ -104,14 +123,14 @@ void Widget::work(int idx, int s)
         dido_in = dido_in | (1 << (idx)) ;
         //status = status ^ ~(1 << (idx * 2 + 1));
     }
-   // fprintf(stderr, "dido_in: 0x%x\n", dido_in);
+    // fprintf(stderr, "dido_in: 0x%x\n", dido_in);
 
 
     if (io_board_write_byte_data(GP2_OUT_PORT_REG, dido_in) < 0) {
         QMessageBox::critical(this, tr("错误"),
                               tr("DIDO写入失败！"),
                               QMessageBox::Ok);
-
+        ret = -1;
     }
 
     usleep(50000);
@@ -121,59 +140,87 @@ void Widget::work(int idx, int s)
         QMessageBox::critical(this, tr("错误"),
                               tr("DIDO读取GP0错误!"),
                               QMessageBox::Ok);
+        ret = -1;
     }
     if (io_board_read_byte_data(GP1_IN_PORT_REG, &gp1_value) < 0) {
         QMessageBox::critical(this, tr("错误"),
                               tr("DIDO读取GP1错误！"),
                               QMessageBox::Ok);
+        ret = -1;
     }
     dido_out = ((gp1_value << 8) | gp0_value);
 
-   // fprintf(stderr, "dido_out: 0x%x\n", dido_out);
+    // fprintf(stderr, "dido_out: 0x%x\n", dido_out);
 
 
-    if ((dido_out & (1<<(idx*2)))) {
+    if (dido_out & (1<<(idx*2))) {
         ui->tableWidget->setItem(0,idx*2, new QTableWidgetItem("低"));
-        ui->tableWidget->item(0, idx*2)->setBackground(Qt::red);
+        //ui->tableWidget->item(0, idx*2)->setBackground(Qt::red);
+
     } else {
         ui->tableWidget->setItem(0, idx*2, new QTableWidgetItem("高"));
-        ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
+        //  ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
     }
-    if ((dido_out & (1<<(idx*2 + 1)))) {
+    if (dido_out & (1<<(idx*2 + 1))) {
         ui->tableWidget->setItem(0,idx*2 + 1, new QTableWidgetItem("低"));
-        ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::red);
+        // ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::red);
+
     } else {
         ui->tableWidget->setItem(0, idx*2 + 1, new QTableWidgetItem("高"));
+        //  ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
+    }
+
+    //return ret;
+
+
+    if ((dido_out & (1 << (idx*2))) ^ (dido_in & (1 << idx))) {
+        ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
+    } else {
+        ui->tableWidget->item(0, idx*2)->setBackground(Qt::red);
+        ret = -1;
+    }
+
+    if ((dido_out & (1 << (idx*2+1))) ^ (dido_in & (1 << idx))) {
         ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
-    }
-
-
-
-    /*
-    if ((dido_out & (1 << (idx*2))) == (dido_in & (1 << idx))) {
-        ui->tableWidget_2->item(0, idx*2)->setBackground(Qt::green);
     } else {
-        ui->tableWidget_2->item(0, idx*2)->setBackground(Qt::red);
+        ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::red);
+        ret = -1;
     }
-    if ((dido_out & (1 << (idx*2+1))) == (dido_in & (1 << idx))) {
-        ui->tableWidget_2->item(0, idx*2+1)->setBackground(Qt::green);
-    } else {
-        ui->tableWidget_2->item(0, idx*2+1)->setBackground(Qt::red);
-    }
-*/
+
+    return ret;
+
 
 }
 
 static void *read_thread(void *arg)
 {
-    FILE *fp;
+    int fd;
+    size_t n=0;
+    ssize_t i;
+    struct timeval oldtime, newtime;
 
-    if ((fp = fopen(USB, "r")) != NULL) {
-        memset(buf, sizeof(buf), 0);
-        fgets(buf, MAXSIZE-1, fp);
-        //fprintf(stderr, "output: %s", buf);
+    struct msg *msg = (struct msg *)arg;
+    unsigned int status;
 
-        fclose(fp);
+    if ((fd = open(msg->path, O_RDONLY|O_NONBLOCK)) > 0) {
+        if (strcmp(msg->path, SERIAL_C) == 0) {
+            ioctl ( fd, TIOCMGET, ( long unsigned int )&status );
+            status &= ~TIOCM_RTS;
+            ioctl ( fd, TIOCMSET, ( long unsigned int )&status );
+        }
+        gettimeofday(&oldtime, NULL);
+        while (n < msg->len) {
+            if ((i = read(fd, &msg->data[n], msg->len)) > 0) {
+                n += i;
+                //fprintf(stderr, "read:%s \nlen: %d\nmsg_len: %d\n\n", msg->data, strlen(msg->data), msg->len);
+            }
+            gettimeofday(&newtime, NULL);
+            if ((newtime.tv_sec * 1000000 + newtime.tv_usec - oldtime.tv_sec * 1000000 - oldtime.tv_usec) > TIMEOUT * 1000000) {
+                pthread_exit((void *)-2);
+            }
+        }
+        msg->data[msg->len] = '\0';
+        close(fd);
         pthread_exit((void *)0);
     } else {
         pthread_exit((void *)-1);
@@ -183,13 +230,36 @@ static void *read_thread(void *arg)
 
 static void *write_thread(void *arg)
 {
-    FILE *fp;
-    char *tmp = (char *)arg;
-    if ((fp = fopen(SERIAL_C, "w")) != NULL) {
-        fputs(tmp, fp);
-       // fprintf(stderr, "input: %s", (char *)arg);
+    int fd;
+    uint32_t status;
+    struct msg *msg = (struct msg *)arg;
 
-        fclose(fp);
+
+    if ((fd = open(msg->path, O_WRONLY)) > 0) {
+
+        if (strcmp(msg->path, SERIAL_C) == 0) {
+            /* Set RTS Pin to High level to enable the RS485 send */
+            ioctl ( fd, TIOCMGET, ( long unsigned int )&status );
+            status |= TIOCM_RTS;
+            ioctl ( fd, TIOCMSET, ( long unsigned int )&status );
+        }
+
+        if (write(fd, msg->data, msg->len) != msg->len) {
+            fprintf(stderr, "%s: write error\n", msg->path);
+        }
+
+       // fprintf(stderr, "sended msg: %s\nlen: %d\nmsg_len: %d\n", msg->data, strlen(msg->data), msg->len);
+
+        usleep(50*1000);
+
+        /* Set RTS Pin to Low level to enable the RS485 recv */
+        if (strcmp(msg->path, SERIAL_C) == 0) {
+            ioctl ( fd, TIOCMGET, ( long unsigned int )&status );
+            status &= ~TIOCM_RTS;
+            ioctl ( fd, TIOCMSET, ( long unsigned int )&status );
+        }
+
+        close(fd);
         pthread_exit((void *)0);
     } else {
         pthread_exit((void *)-1);
@@ -205,8 +275,8 @@ Widget::Widget(QWidget *parent) :
 
     QString title="继电器测试工具 "+ QString(VERSION);
     //setWindowState(Qt::WindowMaximized);
-    setMinimumSize(622, 638);
-    setMaximumSize(622, 638);
+    setMinimumSize(622, 477);
+    setMaximumSize(622, 477);
     setWindowTitle(title);
     int i;
     ui->tableWidget->setRowCount(1);
@@ -234,34 +304,23 @@ Widget::Widget(QWidget *parent) :
     pal.setColor(QPalette::ButtonText, QColor(255,0,0));
     ui->pushButton->setPalette(pal);
 
-
-    /*
-    if (io_board_save_usb() != 0) {
+    if (io_board_init_c(SERIAL_C) < 0) {
         QMessageBox::critical(this, tr("错误"),
-                              tr("保存USB默认设置失败！"),
+                              tr("串口C初始化失败"),
                               QMessageBox::Ok);
-
     }
-    */
+    if (io_board_init_c(USB) < 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("USB初始化失败"),
+                              QMessageBox::Ok);
+    }
+
     if (io_board_init(SERIAL_B) < 0) {
         QMessageBox::critical(this, tr("错误"),
-                              tr("串口初始化失败"),
+                              tr("串口B初始化失败"),
                               QMessageBox::Ok);
     }
 
-
-
-    /*
-    pthread_t tid_r;
-    int err;
-    void *ret1;
-    err = pthread_create(&tid_r, NULL, read_thread, NULL);
-    if (err != 0) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("创建读线程失败！"),
-                              QMessageBox::Ok);
-    }
-    */
 }
 
 Widget::~Widget()
@@ -269,66 +328,111 @@ Widget::~Widget()
     delete ui;
 }
 
-//发送
-void Widget::on_pushButton_clicked()
+
+void Widget::on_pushButton_3_clicked()
+{
+
+    int i, flag = 0;
+    for (i=0; i<8; i++) {
+        if (work(i, 1) < 0) {
+            flag = 1;
+        }
+        qApp->processEvents();
+        sleep(1);
+    }
+
+    for (i=0; i<8; i++) {
+
+        if (work(i, 0) < 0) {
+            flag = 1;
+        }
+        qApp->processEvents();
+        sleep(1);
+    }
+
+    if (flag) {
+
+        QPalette pal = ui->lineEdit_2->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->lineEdit_2->setPalette(pal);
+        ui->lineEdit_2->setText("失败");
+
+    } else {
+        QPalette pal = ui->lineEdit_2->palette();
+        pal.setColor(QPalette::Text, Qt::green);
+        ui->lineEdit_2->setPalette(pal);
+        ui->lineEdit_2->setText("通过");
+    }
+}
+
+void Widget::on_pushButton_4_clicked()
 {
     pthread_t tid1, tid2;
     int err;
     void  *ret1, *ret2;
-    char tmp[MAXSIZE];
-    ui->pushButton->setDisabled(true);
+    struct msg write_msg, read_msg;
+    ui->pushButton_4->setDisabled(true);
 
-    /*
-    if (io_board_restore_usb() != 0) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("设置USB规范模式失败!"),
-                              QMessageBox::Ok);
+    write_msg.len = strlen(ui->textEdit_2->toPlainText().toLatin1());
+    strncpy(write_msg.data, ui->textEdit_2->toPlainText().toLatin1(), MAXSIZE-1);
+    strncpy(write_msg.path, USB, 127);
 
-    }
-    */
-    strncpy(tmp, ui->textEdit->toPlainText().append('\n').toLatin1().data(), MAXSIZE-1);
+    read_msg.len = write_msg.len;
+    strncpy(read_msg.path, SERIAL_C, 127);
 
-    err = pthread_create(&tid1, NULL, read_thread, NULL);
+    err = pthread_create(&tid1, NULL, read_thread, (void *)&read_msg);
     if (err != 0) {
         QMessageBox::critical(this, tr("错误"),
                               tr("创建读线程失败！"),
                               QMessageBox::Ok);
 
-        ui->pushButton->setEnabled(true);
+        ui->pushButton_4->setEnabled(true);
         return;
     }
     usleep(20);
 
-    err = pthread_create(&tid2, NULL, write_thread, (void *)tmp);
+    err = pthread_create(&tid2, NULL, write_thread, (void *)&write_msg);
     if (err != 0) {
         QMessageBox::critical(this, tr("错误"),
                               tr("创建写线程失败！"),
                               QMessageBox::Ok);
-        ui->pushButton->setEnabled(true);
+
+        ui->pushButton_4->setEnabled(true);
         return;
     }
 
     pthread_join(tid1, &ret1);
     pthread_join(tid2, &ret2);
-    if (ret1) {
+    if (ret2) {
         QMessageBox::critical(this, tr("错误"),
                               tr("打开USB失败！"),
                               QMessageBox::Ok);
-        ui->pushButton->setEnabled(true);
+
+        ui->pushButton_4->setEnabled(true);
         return;
     }
 
-    if (ret2) {
+    if ((long)ret1 == -1) {
         QMessageBox::critical(this, tr("错误"),
                               tr("打开串口失败！"),
                               QMessageBox::Ok);
-        ui->pushButton->setEnabled(true);
+
+        ui->pushButton_4->setEnabled(true);
+        return;
+    }
+    if ((long)ret1 == -2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("读取数据超时！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_4->setEnabled(true);
         return;
     }
 
-    ui->textEdit_2->setText(buf);
 
-    if (!strcmp(tmp, buf)) {
+    ui->textEdit->setText(read_msg.data);
+
+    if (!strcmp(read_msg.data, write_msg.data)) {
         QPalette pal = ui->lineEdit->palette();
         pal.setColor(QPalette::Text, Qt::green);
         ui->lineEdit->setPalette(pal);
@@ -341,196 +445,275 @@ void Widget::on_pushButton_clicked()
 
     }
 
-    ui->pushButton->setEnabled(true);
+    ui->pushButton_4->setEnabled(true);
 
 }
 
-//清空
-void Widget::on_pushButton_2_clicked()
-{
-    ui->textEdit->clear();
-    ui->textEdit_2->clear();
-}
 
-//闭合1
-void Widget::on_pushButton_5_clicked()
+void Widget::on_pushButton_13_clicked()
 {
-    if (ui->pushButton_5->text() == "闭合") {
-        work(0, 1);
-        ui->pushButton_5->setText("断开");
-    } else {
-        work(0, 0);
-        ui->pushButton_5->setText("闭合");
+    pthread_t tid1, tid2;
+    int err, flag = 0;
+    void  *ret1, *ret2;
+    struct msg write_msg, read_msg;
+
+    ui->pushButton_13->setDisabled(true);
+
+    write_msg.len = strlen(MSG);
+    strncpy(write_msg.data, MSG, MAXSIZE-1);
+    strncpy(write_msg.path, SERIAL_C, 127);
+
+    read_msg.len = write_msg.len;
+    strncpy(read_msg.path, USB, 127);
+
+
+    err = pthread_create(&tid1, NULL, read_thread, (void *)&read_msg);
+    if (err != 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("创建读线程失败！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_13->setEnabled(true);
+        return;
     }
-}
-//闭合2
-void Widget::on_pushButton_6_clicked()
-{
 
-    if (ui->pushButton_6->text() == "闭合") {
-        work(1, 1);
-        ui->pushButton_6->setText("断开");
-    } else {
-        work(1, 0);
-        ui->pushButton_6->setText("闭合");
+    usleep(20*1000);
+    err = pthread_create(&tid2, NULL, write_thread, (void *)&write_msg);
+    if (err != 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("创建写线程失败！"),
+                              QMessageBox::Ok);
+        ui->pushButton_13->setEnabled(true);
+        return;
     }
+
+
+    pthread_join(tid1, &ret1);
+    pthread_join(tid2, &ret2);
+    if (ret2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("打开串口失败！"),
+                              QMessageBox::Ok);
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+
+    if ((long)ret1 == -1) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("打开USB失败！"),
+                              QMessageBox::Ok);
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+    if ((long)ret1 == -2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("读取数据超时！"),
+                              QMessageBox::Ok);
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+    if (!strcmp(read_msg.data, write_msg.data)) {
+        flag = 0;
+    } else {
+        flag = 1;
+    }
+
+    usleep(500*1000);
+
+    memset(&write_msg, 0, sizeof(write_msg));
+    memset(&read_msg, 0, sizeof(read_msg));
+
+    write_msg.len = strlen(MSG);
+    strncpy(write_msg.data, MSG, MAXSIZE-1);
+    strncpy(write_msg.path, USB, 127);
+
+    read_msg.len = write_msg.len;
+    strncpy(read_msg.path, SERIAL_C, 127);
+
+    err = pthread_create(&tid1, NULL, read_thread, (void *)&read_msg);
+    if (err != 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("创建读线程失败！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+    usleep(20*1000);
+
+    err = pthread_create(&tid2, NULL, write_thread, (void *)&write_msg);
+    if (err != 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("创建写线程失败！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+
+    pthread_join(tid1, &ret1);
+    pthread_join(tid2, &ret2);
+    if (ret2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("打开USB失败！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+
+    if ((long)ret1 == -1) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("打开串口失败！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+
+    if ((long)ret1 == -2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("读取数据超时！"),
+                              QMessageBox::Ok);
+        ui->pushButton_13->setEnabled(true);
+        return;
+    }
+
+    ui->textEdit->setText(read_msg.data);
+
+    if ((flag == 0 )&&!strcmp(read_msg.data, write_msg.data)) {
+        QPalette pal = ui->lineEdit->palette();
+        pal.setColor(QPalette::Text, Qt::green);
+        ui->lineEdit->setPalette(pal);
+        ui->lineEdit->setText("通过");
+    } else {
+        QPalette pal = ui->lineEdit->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->lineEdit->setPalette(pal);
+        ui->lineEdit->setText("失败");
+
+    }
+    ui->pushButton_13->setEnabled(true);
+
 }
 
-//闭合3
-void Widget::on_pushButton_7_clicked()
+
+void Widget::on_comboBox_currentIndexChanged(int index)
 {
-    if (ui->pushButton_7->text() == "闭合") {
-        work(2, 1);
-        ui->pushButton_7->setText("断开");
-    } else {
-        work(2, 0);
-        ui->pushButton_7->setText("闭合");
+    switch (index) {
+    case 0:
+        COM = "/dev/ttyS0";
+        break;
+    case 1:
+        COM = "/dev/ttyS1";
+        break;
+    case 2:
+        COM = "/dev/ttyS2";
+        break;
+    case 3:
+        COM = "/dev/ttyS3";
+        break;
+    case 4:
+        COM = "/dev/ttyS4";
+        break;
+    case 5:
+        COM = "/dev/ttyS5";
+        break;
+    default:
+        COM = "/dev/ttyS0";
     }
+    ui->lineEdit_3->clear();
 }
 
-//闭合4
-void Widget::on_pushButton_8_clicked()
+void Widget::on_pushButton_14_clicked()
 {
-    if (ui->pushButton_8->text() == "闭合") {
-        work(3, 1);
-        ui->pushButton_8->setText("断开");
-    } else {
-        work(3, 0);
-        ui->pushButton_8->setText("闭合");
+    pthread_t tid1, tid2;
+    int err;
+    void  *ret1, *ret2;
+    struct msg write_msg, read_msg;
+
+    ui->pushButton_14->setDisabled(true);
+
+    if (io_board_init_c(COM) < 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("串口C初始化失败"),
+                              QMessageBox::Ok);
+        ui->pushButton_14->setEnabled(true);
+        return;
     }
+
+    write_msg.len = strlen(MSG);
+    strncpy(write_msg.data, MSG, MAXSIZE-1);
+    strncpy(write_msg.path, COM, 127);
+
+    read_msg.len = write_msg.len;
+    strncpy(read_msg.path, COM, 127);
+
+
+    err = pthread_create(&tid1, NULL, read_thread, (void *)&read_msg);
+    if (err != 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("创建读线程失败！"),
+                              QMessageBox::Ok);
+
+        ui->pushButton_14->setEnabled(true);
+        return;
+    }
+
+    usleep(20*1000);
+    err = pthread_create(&tid2, NULL, write_thread, (void *)&write_msg);
+    if (err != 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("创建写线程失败！"),
+                              QMessageBox::Ok);
+        ui->pushButton_14->setEnabled(true);
+        return;
+    }
+
+
+    pthread_join(tid1, &ret1);
+    pthread_join(tid2, &ret2);
+    if (ret2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("打开串口失败！"),
+                              QMessageBox::Ok);
+        ui->pushButton_14->setEnabled(true);
+        return;
+    }
+
+    if ((long)ret1 == -1) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("打开串口失败！"),
+                              QMessageBox::Ok);
+        ui->pushButton_14->setEnabled(true);
+        return;
+    }
+
+    if ((long)ret1 == -2) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("读取数据超时！"),
+                              QMessageBox::Ok);
+        ui->pushButton_14->setEnabled(true);
+        return;
+    }
+    if (!strcmp(read_msg.data, write_msg.data)) {
+        QPalette pal = ui->lineEdit_3->palette();
+        pal.setColor(QPalette::Text, Qt::green);
+        ui->lineEdit_3->setPalette(pal);
+        ui->lineEdit_3->setText("通过");
+    } else {
+        QPalette pal = ui->lineEdit->palette();
+        pal.setColor(QPalette::Text, Qt::red);
+        ui->lineEdit_3->setPalette(pal);
+        ui->lineEdit_3->setText("失败");
+
+    }
+    ui->pushButton_14->setEnabled(true);
 }
 
-//闭合5
-void Widget::on_pushButton_9_clicked()
-{
-    if (ui->pushButton_9->text() == "闭合") {
-        work(4, 1);
-        ui->pushButton_9->setText("断开");
-    } else {
-        work(4, 0);
-        ui->pushButton_9->setText("闭合");
-    }
-}
-
-//闭合6
-void Widget::on_pushButton_10_clicked()
-{
-    if (ui->pushButton_10->text() == "闭合") {
-        work(5, 1);
-        ui->pushButton_10->setText("断开");
-    } else {
-        work(5, 0);
-        ui->pushButton_10->setText("闭合");
-    }
-}
-
-//闭合7
-void Widget::on_pushButton_11_clicked()
-{
-    if (ui->pushButton_11->text() == "闭合") {
-        work(6, 1);
-        ui->pushButton_11->setText("断开");
-    } else {
-        work(6, 0);
-        ui->pushButton_11->setText("闭合");
-    }
-}
-
-//闭合8
-void Widget::on_pushButton_12_clicked()
-{
-    if (ui->pushButton_12->text() == "闭合") {
-        work(7, 1);
-        ui->pushButton_12->setText("断开");
-    } else {
-        work(7, 0);
-        ui->pushButton_12->setText("闭合");
-    }
-}
 #ifdef __cplusplus
 }
 #endif
 
-void Widget::on_pushButton_3_clicked()
-{
-    if (ui->pushButton_5->text() == "闭合") {
-        work(0, 1);
-        ui->pushButton_5->setText("断开");
-    } else {
-        work(0, 0);
-        ui->pushButton_5->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
 
-    if (ui->pushButton_6->text() == "闭合") {
-        work(1, 1);
-        ui->pushButton_6->setText("断开");
-    } else {
-        work(1, 0);
-        ui->pushButton_6->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
 
-    if (ui->pushButton_7->text() == "闭合") {
-        work(2, 1);
-        ui->pushButton_7->setText("断开");
-    } else {
-        work(2, 0);
-        ui->pushButton_7->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
-
-    if (ui->pushButton_8->text() == "闭合") {
-        work(3, 1);
-        ui->pushButton_8->setText("断开");
-    } else {
-        work(3, 0);
-        ui->pushButton_8->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
-
-    if (ui->pushButton_9->text() == "闭合") {
-        work(4, 1);
-        ui->pushButton_9->setText("断开");
-    } else {
-        work(4, 0);
-        ui->pushButton_9->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
-
-    if (ui->pushButton_10->text() == "闭合") {
-        work(5, 1);
-        ui->pushButton_10->setText("断开");
-    } else {
-        work(5, 0);
-        ui->pushButton_10->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
-
-    if (ui->pushButton_11->text() == "闭合") {
-        work(6, 1);
-        ui->pushButton_11->setText("断开");
-    } else {
-        work(6, 0);
-        ui->pushButton_11->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
-
-    if (ui->pushButton_12->text() == "闭合") {
-        work(7, 1);
-        ui->pushButton_12->setText("断开");
-    } else {
-        work(7, 0);
-        ui->pushButton_12->setText("闭合");
-    }
-    qApp->processEvents();
-    sleep(1);
-
-}

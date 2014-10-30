@@ -15,7 +15,7 @@
 #include <time.h>
 #include "tdwy_io_board_api.h"
 
-const char gCommPort[] = "/dev/ttyS0";
+const char gCommPort[] = "/dev/ttyS1";
 #define COMM_TIMEOUT							2
 
 #define LIB_NULL_FUNCTION						0
