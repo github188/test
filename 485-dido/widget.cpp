@@ -23,7 +23,7 @@ extern "C" {
 
 #include "./tdwy_io_board_api.h"
 
-#define VERSION "0.3"
+#define VERSION "0.4"
 #define SERIAL_C "/dev/ttyS0"
 #define SERIAL_B "/dev/ttyS1"
 #define USB "/dev/ttyUSB0"
@@ -155,33 +155,33 @@ int Widget::work(int idx, int s)
 
     if (dido_out & (1<<(idx*2))) {
         ui->tableWidget->setItem(0,idx*2, new QTableWidgetItem("低"));
-        //ui->tableWidget->item(0, idx*2)->setBackground(Qt::red);
+        ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
 
     } else {
         ui->tableWidget->setItem(0, idx*2, new QTableWidgetItem("高"));
-        //  ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
+        ui->tableWidget->item(0, idx*2)->setBackground(Qt::yellow);
     }
     if (dido_out & (1<<(idx*2 + 1))) {
         ui->tableWidget->setItem(0,idx*2 + 1, new QTableWidgetItem("低"));
-        // ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::red);
+        ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
 
     } else {
         ui->tableWidget->setItem(0, idx*2 + 1, new QTableWidgetItem("高"));
-        //  ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
+        ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::yellow);
     }
 
     //return ret;
 
 
     if ((dido_out & (1 << (idx*2))) ^ (dido_in & (1 << idx))) {
-        ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
+        //ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
     } else {
         ui->tableWidget->item(0, idx*2)->setBackground(Qt::red);
         ret = -1;
     }
 
     if ((dido_out & (1 << (idx*2+1))) ^ (dido_in & (1 << idx))) {
-        ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
+        //ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
     } else {
         ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::red);
         ret = -1;
@@ -286,7 +286,7 @@ Widget::Widget(QWidget *parent) :
 
     for (i=0; i<16; i++) {
         ui->tableWidget->setItem(0,i, new QTableWidgetItem("高"));
-        ui->tableWidget->item(0,i)->setBackgroundColor(Qt::green);
+        ui->tableWidget->item(0,i)->setBackgroundColor(Qt::yellow);
         // ui->tableWidget_2->setItem(0, i, new QTableWidgetItem(QString::number(i+1)));
         //ui->tableWidget_2->item(0,i)->setBackgroundColor(Qt::green);
     }
@@ -299,14 +299,9 @@ Widget::Widget(QWidget *parent) :
     }
 */
 
-
-    QPalette pal=ui->pushButton->palette();
-    pal.setColor(QPalette::ButtonText, QColor(255,0,0));
-    ui->pushButton->setPalette(pal);
-
     if (io_board_init_c(SERIAL_C) < 0) {
         QMessageBox::critical(this, tr("错误"),
-                              tr("串口C初始化失败"),
+                              tr("串口初始化失败"),
                               QMessageBox::Ok);
     }
     if (io_board_init_c(USB) < 0) {
@@ -332,6 +327,14 @@ Widget::~Widget()
 void Widget::on_pushButton_3_clicked()
 {
 
+
+    if (io_board_init(SERIAL_B) < 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("串口B初始化失败"),
+                              QMessageBox::Ok);
+    }
+
+    usleep(500*1000);
     int i, flag = 0;
     for (i=0; i<8; i++) {
         if (work(i, 1) < 0) {
@@ -365,90 +368,6 @@ void Widget::on_pushButton_3_clicked()
     }
 }
 
-void Widget::on_pushButton_4_clicked()
-{
-    pthread_t tid1, tid2;
-    int err;
-    void  *ret1, *ret2;
-    struct msg write_msg, read_msg;
-    ui->pushButton_4->setDisabled(true);
-
-    write_msg.len = strlen(ui->textEdit_2->toPlainText().toLatin1());
-    strncpy(write_msg.data, ui->textEdit_2->toPlainText().toLatin1(), MAXSIZE-1);
-    strncpy(write_msg.path, USB, 127);
-
-    read_msg.len = write_msg.len;
-    strncpy(read_msg.path, SERIAL_C, 127);
-
-    err = pthread_create(&tid1, NULL, read_thread, (void *)&read_msg);
-    if (err != 0) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("创建读线程失败！"),
-                              QMessageBox::Ok);
-
-        ui->pushButton_4->setEnabled(true);
-        return;
-    }
-    usleep(20);
-
-    err = pthread_create(&tid2, NULL, write_thread, (void *)&write_msg);
-    if (err != 0) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("创建写线程失败！"),
-                              QMessageBox::Ok);
-
-        ui->pushButton_4->setEnabled(true);
-        return;
-    }
-
-    pthread_join(tid1, &ret1);
-    pthread_join(tid2, &ret2);
-    if (ret2) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("打开USB失败！"),
-                              QMessageBox::Ok);
-
-        ui->pushButton_4->setEnabled(true);
-        return;
-    }
-
-    if ((long)ret1 == -1) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("打开串口失败！"),
-                              QMessageBox::Ok);
-
-        ui->pushButton_4->setEnabled(true);
-        return;
-    }
-    if ((long)ret1 == -2) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("读取数据超时！"),
-                              QMessageBox::Ok);
-
-        ui->pushButton_4->setEnabled(true);
-        return;
-    }
-
-
-    ui->textEdit->setText(read_msg.data);
-
-    if (!strcmp(read_msg.data, write_msg.data)) {
-        QPalette pal = ui->lineEdit->palette();
-        pal.setColor(QPalette::Text, Qt::green);
-        ui->lineEdit->setPalette(pal);
-        ui->lineEdit->setText("通过");
-    } else {
-        QPalette pal = ui->lineEdit->palette();
-        pal.setColor(QPalette::Text, Qt::red);
-        ui->lineEdit->setPalette(pal);
-        ui->lineEdit->setText("失败");
-
-    }
-
-    ui->pushButton_4->setEnabled(true);
-
-}
-
 
 void Widget::on_pushButton_13_clicked()
 {
@@ -458,6 +377,17 @@ void Widget::on_pushButton_13_clicked()
     struct msg write_msg, read_msg;
 
     ui->pushButton_13->setDisabled(true);
+
+    if (io_board_init_c(SERIAL_C) < 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("串口C初始化失败"),
+                              QMessageBox::Ok);
+    }
+    if (io_board_init_c(USB) < 0) {
+        QMessageBox::critical(this, tr("错误"),
+                              tr("USB初始化失败"),
+                              QMessageBox::Ok);
+    }
 
     write_msg.len = strlen(MSG);
     strncpy(write_msg.data, MSG, MAXSIZE-1);
@@ -579,7 +509,6 @@ void Widget::on_pushButton_13_clicked()
         return;
     }
 
-    ui->textEdit->setText(read_msg.data);
 
     if ((flag == 0 )&&!strcmp(read_msg.data, write_msg.data)) {
         QPalette pal = ui->lineEdit->palette();
@@ -636,8 +565,9 @@ void Widget::on_pushButton_14_clicked()
 
     if (io_board_init_c(COM) < 0) {
         QMessageBox::critical(this, tr("错误"),
-                              tr("串口C初始化失败"),
+                              tr("COM初始化失败"),
                               QMessageBox::Ok);
+
         ui->pushButton_14->setEnabled(true);
         return;
     }
@@ -675,7 +605,7 @@ void Widget::on_pushButton_14_clicked()
     pthread_join(tid2, &ret2);
     if (ret2) {
         QMessageBox::critical(this, tr("错误"),
-                              tr("打开串口失败！"),
+                              tr("打开COM失败！"),
                               QMessageBox::Ok);
         ui->pushButton_14->setEnabled(true);
         return;
@@ -683,7 +613,7 @@ void Widget::on_pushButton_14_clicked()
 
     if ((long)ret1 == -1) {
         QMessageBox::critical(this, tr("错误"),
-                              tr("打开串口失败！"),
+                              tr("打开COM失败！"),
                               QMessageBox::Ok);
         ui->pushButton_14->setEnabled(true);
         return;
