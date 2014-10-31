@@ -23,7 +23,7 @@ extern "C" {
 
 #include "./tdwy_io_board_api.h"
 
-#define VERSION "0.4"
+#define VERSION "0.5"
 #define SERIAL_C "/dev/ttyS0"
 #define SERIAL_B "/dev/ttyS1"
 #define USB "/dev/ttyUSB0"
@@ -116,18 +116,18 @@ int Widget::work(int idx, int s)
 
 
     if (s) {
-        dido_in = dido_in & ~(1 << (idx));
-        // status = status | (1 << (idx * 2 + 1));
-    } else {
-
         dido_in = dido_in | (1 << (idx)) ;
-        //status = status ^ ~(1 << (idx * 2 + 1));
-    }
-    // fprintf(stderr, "dido_in: 0x%x\n", dido_in);
+
+       // status = status | (1 << (idx * 2 + 1));
+   } else {
+         dido_in = dido_in & ~(1 << (idx));
+       //status = status ^ ~(1 << (idx * 2 + 1));
+   }
 
 
-    if (io_board_write_byte_data(GP2_OUT_PORT_REG, dido_in) < 0) {
-        QMessageBox::critical(this, tr("错误"),
+
+   if (io_board_write_byte_data(GP2_OUT_PORT_REG, dido_in) < 0) {
+       QMessageBox::critical(this, tr("错误"),
                               tr("DIDO写入失败！"),
                               QMessageBox::Ok);
         ret = -1;
@@ -149,8 +149,8 @@ int Widget::work(int idx, int s)
         ret = -1;
     }
     dido_out = ((gp1_value << 8) | gp0_value);
-
-    // fprintf(stderr, "dido_out: 0x%x\n", dido_out);
+    fprintf(stderr, "dido_in: 0x%x\n", dido_in);
+    fprintf(stderr, "dido_out: 0x%x\n", dido_out);
 
 
     if (dido_out & (1<<(idx*2))) {
@@ -173,16 +173,14 @@ int Widget::work(int idx, int s)
     //return ret;
 
 
-    if ((dido_out & (1 << (idx*2))) ^ (dido_in & (1 << idx))) {
-        //ui->tableWidget->item(0, idx*2)->setBackground(Qt::green);
-    } else {
+    if ( (((dido_out & (1 << (idx*2))) == 0) && ((dido_in & (1 << idx)) == 0)) ||
+         (((dido_out & (1 << (idx*2))) != 0) && ((dido_in & (1 << idx)) != 0)) ) {
         ui->tableWidget->item(0, idx*2)->setBackground(Qt::red);
         ret = -1;
     }
 
-    if ((dido_out & (1 << (idx*2+1))) ^ (dido_in & (1 << idx))) {
-        //ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::green);
-    } else {
+    if ( (((dido_out & (1 << (idx*2+1))) == 0) && ((dido_in & (1 << idx)) == 0)) ||
+         (((dido_out & (1 << (idx*2+1))) != 0) && ((dido_in & (1 << idx)) != 0)) )  {
         ui->tableWidget->item(0, idx*2+1)->setBackground(Qt::red);
         ret = -1;
     }
@@ -273,7 +271,7 @@ Widget::Widget(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    QString title="继电器测试工具 "+ QString(VERSION);
+    QString title="DIDO及串口测试工具 "+ QString(VERSION);
     //setWindowState(Qt::WindowMaximized);
     setMinimumSize(622, 477);
     setMaximumSize(622, 477);
@@ -327,17 +325,9 @@ Widget::~Widget()
 void Widget::on_pushButton_3_clicked()
 {
 
-
-    if (io_board_init(SERIAL_B) < 0) {
-        QMessageBox::critical(this, tr("错误"),
-                              tr("串口B初始化失败"),
-                              QMessageBox::Ok);
-    }
-
-    usleep(500*1000);
     int i, flag = 0;
     for (i=0; i<8; i++) {
-        if (work(i, 1) < 0) {
+        if (work(i, 0) < 0) {
             flag = 1;
         }
         qApp->processEvents();
@@ -346,7 +336,7 @@ void Widget::on_pushButton_3_clicked()
 
     for (i=0; i<8; i++) {
 
-        if (work(i, 0) < 0) {
+        if (work(i, 1) < 0) {
             flag = 1;
         }
         qApp->processEvents();
