@@ -8,6 +8,7 @@ if [ "$1" = "init" ]; then
 		slots=`/opt/mega/MegaCli64 -PDList -aALL -nolog|grep -i slot|awk -F : '{print $2}'|tr -d " "`
 		for i in $slots
 		do
+			/opt/mega/MegaCli64 -PDMakeGood -PhysDrv [$enc:$i] -Force -aALL -nolog > /dev/null 2>&1
 			/opt/mega/MegaCli64 -CfgLdAdd -r0[$enc:$i] WB -a0 -nolog > /dev/null 2>&1
 		done
 	fi
