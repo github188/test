@@ -85,47 +85,53 @@ if [ -f /tmp/.disk_list ]; then
 fi
 touch /tmp/.disk_list
 sys_disk=`mount -l | grep " / "|awk '{print $1}'|awk -F \/ '{print $3}'|tr -d [:digit:]`
+
+
 if [ "$hw_type" = "3U16-STANDARD-SAS" ]; then
+
+	temp=`ls -al /sys/block |grep -v usb |grep -v host1 | grep -v host2| grep -v $sys_disk| grep '/host[0-9]*/target.*/block/sd[a-z]*'`
+	
 	if /opt/cmdline/arcconf GETCONFIG 1 > /dev/null 2>&1;then
-	slot_nums=(`/opt/cmdline/arcconf GETCONFIG 1|grep Location|awk '{print $NF}'`)
-	idx=0
+		device_nums=(`/opt/cmdline/arcconf GETCONFIG 1 PD| grep Channel,Device|grep -v "(0:0)"|awk -F [:\(] '{print $4}' | awk -F , '{print $2}'`)
+		slot_nums=(`/opt/cmdline/arcconf GETCONFIG 1 PD| grep Location| awk '{print $NF}'`)
 	fi
 	if ! /opt/mega/MegaCli64 -adpCount -nolog > /dev/null 2>&1; then
+		device_nums=(`/opt/mega/MegaCli64 -PDList -aALL -nolog|grep Slot| awk '{print $NF}'`)
 		slot_nums=(`/opt/mega/MegaCli64 -PDList -aALL -nolog|grep Slot|awk '{print $NF}'`)
-		idx=0
 	fi
-fi
-ls -l /sys/block | while read line
-do
-	#temp=$(echo $line | grep 'ata[0-9]*/host[0-9]*/target.*/block/sd[a-z]*')
-	temp=$(echo $line |grep -v usb |grep -v host1 | grep -v host2| grep -v $sys_disk| grep '/host[0-9]*/target.*/block/sd[a-z]*')
-	if [ $? -eq 0 ]; then
-		if [ "$hw_type" = "3U16-STANDARD-SAS" ]; then
-			slot_num=${slot_nums[$idx]}
-			slot_num=$((slot_num+1))
-			idx=$((idx+1))
-		else
+
+	for ((i=0; i<${#slot_nums[@]}; i++))
+	do	
+		sdx_id=`echo "$temp"|grep ":${device_nums[$i]}:0/block"|awk '{print $9}'`
+		dev_name="/dev/${sdx_id}"
+		slot_num=$((${slot_nums[$i]}+1))
+		if [ "x$sdx_id" != "x" ]; then
+			echo "\"slot\"":"\"0:$slot_num\"",  "\"dev\"":"\"$dev_name\""  >> /tmp/.disk_list
+		fi
+	done
+else
+	ls -l /sys/block | while read line
+	do
+		#temp=$(echo $line | grep 'ata[0-9]*/host[0-9]*/target.*/block/sd[a-z]*')
+		temp=$(echo $line |grep -v usb |grep -v host1 | grep -v host2| grep -v $sys_disk| grep '/host[0-9]*/target.*/block/sd[a-z]*')
+		if [ $? -eq 0 ]; then
 			ata_num=$(echo $temp | awk -F /host '{print $2}' | awk -F \/ '{print $1}')
 			ata_num=$(($ata_num+1))
 			if [ $ata_num -le 2 ]; then
 				continue
 			fi
 			calculate_slot $ata_num $hw_type
+			sdx_id=$(echo $temp | awk -F /block/ '{print $2}')
+			dev_name="/dev/$sdx_id"
+
+			echo "\"slot\"":"\"0:$slot_num\"",  "\"dev\"":"\"$dev_name\""  >> /tmp/.disk_list
 		fi
-		sdx_id=$(echo $temp | awk -F /block/ '{print $2}')
-		dev_name="/dev/$sdx_id"
-
-		echo "\"slot\"":"\"0:$slot_num\"",  "\"dev\"":"\"$dev_name\""  >> /tmp/.disk_list
-		
-	
-	fi
-done
-
+	done
+fi
 disk_num=$(wc -l /tmp/.disk_list | awk '{print $1}')
 #if [ "$disk_num" = "0" ]; then
 #	echo "No disk exist"
 #else
 	sort -t: +2 -3 -g /tmp/.disk_list
 #fi
-
 rm -f /tmp/.disk_list

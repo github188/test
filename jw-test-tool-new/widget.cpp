@@ -391,6 +391,9 @@ void Widget::mon_update()
     cmd = "jw-aging cpu";
     out = bash_cmd(cmd) + "%";
     ui->lineEdit_8->setText(out);
+    cmd = "jw-aging cpu_temp";
+    out = bash_cmd(cmd) + "℃";
+    ui->lineEdit_12->setText(out);
     cmd = "jw-aging mem";
     out = bash_cmd(cmd);
     //out_list = out.split(";");

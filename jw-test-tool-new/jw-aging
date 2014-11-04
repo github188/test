@@ -398,12 +398,12 @@ do
 	if [ ! -b /dev/$disk ]; then
 		return 1
 	fi					                
-	dd if=/dev/zero of=/dev/$disk bs=1M > /dev/null 2>&1
+	dd if=/dev/zero of=/dev/$disk bs=1M count=100k > /dev/null 2>&1
 	(flock -n 9 
 	       	killall dd > /dev/null 2>&1
 		sleep 3
 	) 9>>/run/lock/aging_io_lock	
-	dd if=/dev/$disk of=/dev/null bs=1M > /dev/null 2>&1
+	dd if=/dev/$disk of=/dev/null bs=1M count=100k > /dev/null 2>&1
 	(flock -n 9 
 		killall dd > /dev/null 2>&1
 		sleep 3
@@ -655,6 +655,12 @@ cpu()
 	cpu=`echo "100-$cpu"|bc`
 	printf %02.2f $cpu
 }
+cpu_temp()
+{
+	cpu_t=`cat /sys/bus/platform/devices/nct6106.656/temp17_input`
+	value=`echo "$cpu_t / 1000" | bc`
+	echo -n "$value"
+}
 mem()
 {
 	#info=`sar -u  -r 1 1|sed -n "10p;13p"`
@@ -852,6 +858,9 @@ case $1 in
 	;;
 "cpu")
 	cpu
+	;;
+"cpu_temp")
+	cpu_temp
 	;;
 "mem")
 	mem
