@@ -1,5 +1,6 @@
 #!/bin/bash
 
+VERSION="0.8"
 slot_num=0
 
 
@@ -63,6 +64,11 @@ SYS_6036Z_S="1007"
 SYS_CMS1100G2="1011"
 
 hw_type="unkown"
+
+if [ "x$1" = "xversion" ]; then
+	echo $VERSION
+	exit 0
+fi
 
 product_name=`dmidecode -s baseboard-product-name 2>/dev/null`
 

@@ -6,6 +6,7 @@
 # Filename : jw-aging.sh
 # Description : v0.3
 ###############################################################################
+VERSION="0.8"
 iperf_tmp="/tmp/iperf"
 dd_tmp="/tmp/dd"
 net_speed_limit=100
@@ -467,33 +468,19 @@ if [ -e /run/lock/jw-aging.lock ]; then
 	echo -e "remote"
 	return
 fi
-	remote_net=0
-	for ((i=0; i<$Eth_num; i++))
-	do
-		ifconfig eth$i 192.13.$(($i+1)).3 netmask 255.255.255.0
-	done
 
-	ping -W 3 -c 2 192.13.1.1 > /dev/null 2>&1
+remote_net=0
+local_net=`ifconfig eth0 | grep inet|grep -v inet6|awk '{print $2}' | awk -F . '{print $4}'`
 
-	if [ $? -ne 0 ] ; then
-		ping -W 3 -c 2 192.13.1.2 > /dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo -e "Null"
-			return
-		else
-			remote_net=2
-			for ((i=0; i<$Eth_num; i++)) 
-			do
-				ifconfig eth$i 192.13.$(($i+1)).1 netmask 255.255.255.0
-			done
-		fi
-	else
-		remote_net=1
-		for ((i=0; i<$Eth_num; i++))
-		do
-			ifconfig eth$i 192.13.$(($i+1)).2 netmask 255.255.255.0
-		done	
-	fi
+if [ $local_net -eq 2 ];then
+	remote_net=1
+else 
+	remote_net=2
+fi
+if ! ping -W 3 -c 2 192.13.1.$remote_net > /dev/null 2>&1; then
+	echo -e "Null"
+	return
+fi
 
 echo "1"|nc 192.13.1.${remote_net} 21700
 pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
@@ -511,7 +498,7 @@ done
 #!/bin/bash
 while true
 do
-	iperf -c 192.13.$(($i+1)).$remote_net -d -t 3600 > /dev/null 2>&1  
+	iperf -c 192.13.$(($i+1)).$remote_net -p 50$((remote_net))$(($i+1)) -d -t 3600 > /dev/null 2>&1  
 done
 EOF
 	chmod +x $file
@@ -676,17 +663,33 @@ free_mem()
 	free_mem=`free -m|sed -n 2p|awk '{print $4}'`
 	echo -e $free_mem
 }
-fan()
+fan1()
 {
 	hwmon=`sys-mon-shell`
 	cpu_temp=`echo "$hwmon"|sed -n 13p|awk '{print $1}'`
 	chassis_temp=`echo "$hwmon"|sed -n 13p |awk '{print $2}'`
 	fan1_speed=`echo "$hwmon"|sed -n 13p|awk '{print $4}'`
-	fan2_speed=`echo "$hwmon"|sed -n 13p|awk '{print $5}'`
-		
-	echo -e "fan1:$fan1_speed rpm  fan2:$fan2_speed rpm"
+	echo -e "fan1:$fan1_speed rpm"
+	if [ $fan1_speed -lt 3000 ]; then
+		echo -e "false"
+	else
+		echo -e "true"
+	fi	
 }
-power()
+fan2()
+{
+	hwmon=`sys-mon-shell`
+	cpu_temp=`echo "$hwmon"|sed -n 13p|awk '{print $1}'`
+	chassis_temp=`echo "$hwmon"|sed -n 13p |awk '{print $2}'`
+	fan2_speed=`echo "$hwmon"|sed -n 13p|awk '{print $5}'`
+	echo -e "fan2:$fan2_speed rpm"
+	if [ $fan2_speed -lt 3000 ]; then
+		echo -e "false"
+	else
+		echo -e "true"
+	fi
+}
+power1()
 {
 	hwmon=`sys-mon-shell`
 	power1_vin=`echo "$hwmon"|sed -n 5p|awk '{print $1}'`
@@ -694,13 +697,79 @@ power()
 	power1_fan=`echo "$hwmon"|sed -n 5p|awk '{print $3}'`
 	power1_amb=`echo "$hwmon"|sed -n 5p|awk '{print $4}'`
 	power1_hs=`echo "$hwmon"|sed -n 5p|awk '{print $5}'`
+	if [ $power1_vin = "unknown" ];then
+		power1_vin=0
+	fi
+	if [ $power1_vout = "unknown" ];then
+		power1_vout=0
+	fi
+	if [ $power1_fan = "unknown" ];then
+		power1_fan=0
+	fi
+	if [ $power1_amb = "unknown" ]; then
+		power1_amb=0
+	fi
+	if [ $power1_hs = "unknown" ];then
+		power1_hs=0
+	fi
+	printf  "power1 vin:"%-3d"V vout:"%-3d"V fan_speed:"%-5d"rpm amb_temp:"%-2d"℃  hs_temp:"%-2d"℃ \n" $power1_vin $power1_vout $power1_fan $power1_amb $power1_hs
+	if [ $power1_vin -lt 120 -o $power1_vin -gt 260 ];then
+		echo -e "false"
+		return
+	fi
+	if [ $power1_vout -lt 11 -o $power1_vout -gt 13 ]; then
+		echo -e "false"
+		return
+	fi
+	if [ $power1_amb -gt 46 ]; then
+		echo -e "false"
+		return
+	fi
+	
+	echo -e "true"
+	
+	
+}
+power2()
+{
+	hwmon=`sys-mon-shell`
 	power2_vin=`echo "$hwmon"|sed -n 9p|awk '{print $1}'`
 	power2_vout=`echo "$hwmon"|sed -n 9p|awk '{print $2}'`	
 	power2_fan=`echo "$hwmon"|sed -n 9p|awk '{print $3}'`
 	power2_amb=`echo "$hwmon"|sed -n 9p|awk '{print $4}'`
 	power2_hs=`echo "$hwmon"|sed -n 9p|awk '{print $5}'`
-	printf  "power1 vin:"%-3d"V vout:"%-3d"V fan_speed:"%-5d"rpm amb_temp:"%-2d"℃  hs_temp:"%-2d"℃ \n" $power1_vin $power1_vout $power1_fan $power1_amb $power1_hs
+	if [ $power2_vin = "unknown" ];then
+		power2_vin=0
+	fi
+	if [ $power2_vout = "unknown" ];then
+		power2_vout=0
+	fi
+	if [ $power2_fan = "unknown" ];then
+		power2_fan=0
+	fi
+	if [ $power2_amb = "unknown" ]; then
+		power2_amb=0
+	fi
+	if [ $power2_hs = "unknown" ];then
+		power2_hs=0
+	fi
+
 	printf  "power2 vin:"%-3d"V vout:"%-3d"V fan_speed:"%-5d"rpm amb_temp:"%-2d"℃  hs_temp:"%-2d"℃ \n" $power2_vin $power2_vout $power2_fan $power2_amb $power2_hs
+	if [ $power2_vin -lt 120 -o $power2_vin -gt 260 ];then
+		echo -e "false"
+		return
+	fi
+	if [ $power2_vout -lt 11 -o $power2_vout -gt 13 ]; then
+		echo -e "false"
+		return
+	fi
+	if [ $power2_amb -gt 46 ]; then
+		echo -e "false"
+		return
+	fi
+	
+	echo -e "true"
+	
 }
 
 net_speed_test_new()
@@ -709,33 +778,20 @@ if [ -e /run/lock/jw-aging.lock ]; then
 	echo -e "remote"
 	return
 fi
-	remote_net=0
-	for ((i=0; i<$Eth_num; i++))
-	do
-		ifconfig eth$i 192.13.$(($i+1)).3 netmask 255.255.255.0
-	done
 
-	ping -W 3 -c 2 192.13.1.1 > /dev/null 2>&1
+remote_net=0
+local_net=`ifconfig eth0 | grep inet|grep -v inet6|awk '{print $2}' | awk -F . '{print $4}'`
 
-	if [ $? -ne 0 ] ; then
-		ping -W 3 -c 2 192.13.1.2 > /dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			echo -e "Null"
-			return
-		else
-			remote_net=2
-			for ((i=0; i<$Eth_num; i++)) 
-			do
-				ifconfig eth$i 192.13.$(($i+1)).1 netmask 255.255.255.0
-			done
-		fi
-	else
-		remote_net=1
-		for ((i=0; i<$Eth_num; i++))
-		do
-			ifconfig eth$i 192.13.$(($i+1)).2 netmask 255.255.255.0
-		done	
-	fi
+if [ $local_net -eq 2 ];then
+	remote_net=1
+else 
+	remote_net=2
+fi
+
+if ! ping -W 3 -c 2 192.13.1.$remote_net > /dev/null 2>&1; then
+	echo -e "Null"
+	return
+fi
 
 echo "1"|nc 192.13.1.${remote_net} 21700
 pids=`ps axu|grep "iperf -c"|grep -v grep|awk '{print $2}'`
@@ -751,7 +807,7 @@ done
 		file=/tmp/net_eth${i}_speed.sh
 cat <<EOF >$file
 #!/bin/bash
-	iperf -c 192.13.$((i+1)).$remote_net -d -t 15 > /dev/nll 2>&1  
+iperf -c 192.13.$((i+1)).$remote_net -p 50$((remote_net))$((i+1)) -d -t 15 > /dev/nll 2>&1  
 EOF
 	chmod +x $file
 	$file &
@@ -810,7 +866,14 @@ net_mac()
 	mac_info=`ip addr|grep ether|awk '{print $2}'`
 	echo "$mac_info"
 }
-case $1 in 
+version()
+{
+	echo $VERSION
+}
+case $1 in
+"version")
+	version
+	;;
 "ip_address")
 	get_ip
 	;;
@@ -868,11 +931,17 @@ case $1 in
 "free_mem")
 	free_mem
 	;;
-"fan")
-	fan
+"fan1")
+	fan1
 	;;
-"power")
-	power
+"fan2")
+	fan2
+	;;
+"power1")
+	power1
+	;;
+"power2")
+	power2
 	;;
 "net_speed_test_new")
 	net_speed_test_new

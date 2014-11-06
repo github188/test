@@ -3,7 +3,6 @@
 
 #include <QWidget>
 
-#define JW_LOCKFILE "/run/lock/jw-aging-bin.lock"
 namespace Ui {
 class Widget;
 }

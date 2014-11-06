@@ -1,5 +1,8 @@
 #!/bin/bash
-
+VERSION="0.8"
+if [ "x$1" = "xversion" ]; then
+	echo $VERSION
+fi
 if [ "$1" = "init" ]; then
 	if ! /opt/mega/MegaCli64 -adpCount -nolog > /dev/null 2>&1; then
 		/opt/mega/MegaCli64 -CfgSave -f /tmp/raid_saved -a0 -nolog
