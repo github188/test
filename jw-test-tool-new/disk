@@ -113,7 +113,7 @@ else
 	ls -l /sys/block | while read line
 	do
 		#temp=$(echo $line | grep 'ata[0-9]*/host[0-9]*/target.*/block/sd[a-z]*')
-		temp=$(echo $line |grep -v usb |grep -v host1 | grep -v host2| grep -v $sys_disk| grep '/host[0-9]*/target.*/block/sd[a-z]*')
+		temp=$(echo $line |grep -v usb | grep -v $sys_disk| grep '/host[0-9]*/target.*/block/sd[a-z]*')
 		if [ $? -eq 0 ]; then
 			ata_num=$(echo $temp | awk -F /host '{print $2}' | awk -F \/ '{print $1}')
 			ata_num=$(($ata_num+1))
