@@ -11,8 +11,6 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = 485
 TEMPLATE = app
 
-LIBS +=./libtdwy_io_board_api.a
-
 SOURCES += main.cpp\
         widget.cpp \
     tdwy_io_board_api.c

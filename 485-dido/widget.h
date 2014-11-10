@@ -27,6 +27,10 @@ private slots:
 
     void on_pushButton_14_clicked();
 
+    void on_comboBox_2_currentIndexChanged(int index);
+
+    void on_comboBox_3_currentIndexChanged(int index);
+
 private:
     Ui::Widget *ui;
 

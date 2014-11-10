@@ -15,7 +15,10 @@
 #include <time.h>
 #include "tdwy_io_board_api.h"
 
-const char gCommPort[] = "/dev/ttyS1";
+
+
+
+extern char gCommPort[16];
 #define COMM_TIMEOUT							2
 
 #define LIB_NULL_FUNCTION						0
@@ -310,10 +313,9 @@ static int io_board_xfer_msg_to_mcu ( comm_msg_header *pXferMsg )
 	int ret = 0, io_len;
 	struct flock comm_lock;
 	uint8_t io_buf[32];
-	uint8_t check_buf[32];
-
+    uint8_t check_buf[32];
 	fd = open ( gCommPort, O_RDWR | O_NOCTTY | O_NDELAY );
-	if ( fd < 0 ) {
+    if ( fd < 0 ) {
 #if ( LIB_IO_BOARD_API_DEBUG_EN == 1 )		
 		printf ( "Open %s failed.\n", gCommPort );
 #endif
