@@ -1,9 +1,28 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QDebug>
+#include <QProcess>
 
 QString ip;
 QString gateway;
+
+QString bash_cmd(QString cmd)
+{
+    QString cmd_bash = "bash -c \"" + cmd + "\"";
+    QString out="";
+    QProcess *process = new QProcess();
+    //qDebug()<<"cmd:"<<cmd_bash;
+    process->start(cmd_bash);
+
+    process->waitForFinished(60000);
+
+    out = process->readAllStandardOutput();
+    if (out.endsWith("\n")) {
+        out.replace((out.length()-1),1,"");
+    }
+    //qDebug()<<"out:"<<out;
+    return out;
+}
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -25,6 +44,9 @@ int ip_cfg(QString ip, QString gateway)
 
         QString cmd;
         int i=0;
+        cmd = "killall dhclient";
+
+        system(cmd.toLatin1());
         cmd = "ifconfig eth0 " + ip + " netmask 255.255.255.0 ";
 
         qDebug() << cmd;
@@ -110,4 +132,37 @@ error:
          ui->lineEdit->clear();
          ui->lineEdit_3->clear();
 }
+}
+
+void MainWindow::on_pushButton_3_clicked()
+{
+    QString cmd;
+    QString out;
+
+    cmd = "killall dhclient";
+    bash_cmd(cmd);
+
+    cmd = "dhclient eth0";
+    out = bash_cmd(cmd);
+    ui->textBrowser->setText(out);
+
+
+    cmd = "ip addr show eth0 | grep inet|grep -v inet6";
+    out = bash_cmd(cmd);
+    ui->textBrowser->setText(out);
+
+}
+
+void MainWindow::on_pushButton_4_clicked()
+{
+    QString cmd;
+    QString out;
+    cmd = "ntpdate time.nist.gov";
+    out = bash_cmd(cmd);
+    ui->textBrowser->setText(out);
+    cmd = "hwclock -s";
+    out = bash_cmd(cmd);
+    cmd = "date";
+    out = bash_cmd(cmd);
+    ui->textBrowser->setText(out);
 }
