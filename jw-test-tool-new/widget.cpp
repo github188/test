@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#define  VERSION   0.8
+#define  VERSION   0.9
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -176,6 +176,8 @@ Widget::Widget(QWidget *parent) :
     cmd = "jw-aging memory_info";
     ui->textEdit->setText(bash_cmd(cmd));
 
+    cmd = "jw-aging sysdisk_info";
+    ui->textEdit_10->setText(bash_cmd(cmd));
 
     cmd = "jw-aging fireware";
     ui->textEdit_6->setText(bash_cmd(cmd));

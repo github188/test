@@ -160,8 +160,6 @@ void MainWindow::on_pushButton_4_clicked()
     cmd = "ntpdate time.nist.gov";
     out = bash_cmd(cmd);
     ui->textBrowser->setText(out);
-    cmd = "hwclock -s";
-    out = bash_cmd(cmd);
     cmd = "date";
     out = bash_cmd(cmd);
     ui->textBrowser->setText(out);

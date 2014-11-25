@@ -6,7 +6,7 @@
 # Filename : jw-aging.sh
 # Description : v0.3
 ###############################################################################
-VERSION="0.8"
+VERSION="0.9"
 iperf_tmp="/tmp/iperf"
 dd_tmp="/tmp/dd"
 net_speed_limit=100
@@ -870,6 +870,15 @@ version()
 {
 	echo $VERSION
 }
+sysdisk_info()
+{
+	sysdisk=`mount | grep " / "|awk '{print $1}'| tr -d [:digit:]`
+	sysdisk_info=`smartctl -i $sysdisk`
+	
+	sysdisk_mode=`echo "$sysdisk_info" | sed -n '5p'|awk -F : '{print $2}'`
+	sysdisk_cap=`echo "$sysdisk_info" | sed -n '9p' | awk -F : '{print $NF}'`
+	echo "$sysdisk $sysdisk_mode $sysdisk_cap"
+}
 case $1 in
 "version")
 	version
@@ -900,6 +909,9 @@ case $1 in
 	;;
 "sata_info")
 	sata_info
+	;;
+"sysdisk_info")
+	sysdisk_info
 	;;
 "buzzer_test")
 	buzzer_test $2
