@@ -78,7 +78,7 @@ Widget::Widget(QWidget *parent) :
     ui(new Ui::Widget)
 {
     ui->setupUi(this);
-
+    setWindowIcon(QIcon(":jw-test-tool.png"));
 
     int fd;
      struct flock lock;
