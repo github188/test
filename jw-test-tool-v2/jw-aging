@@ -524,7 +524,7 @@ test_net()
 #!/bin/bash
 while true
 do
-        iperf -c 192.13.$(($i+1)).$remote_net -p 50$((remote_net))$(($i+1)) -d -t 3600 > /dev/null 2>&1
+        iperf -c 192.13.$(($i+1)).$remote_net -p 50$((remote_net))$(($i+1)) -d -t 600 > /dev/null 2>&1
 done
 EOF
         chmod +x $file

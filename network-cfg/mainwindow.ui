@@ -123,11 +123,24 @@
        </layout>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
+       <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QPushButton" name="pushButton_3">
           <property name="text">
-           <string>自动获取</string>
+           <string>自动获取IP地址</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButton">
+          <property name="text">
+           <string>手动设置IP地址</string>
+          </property>
+          <property name="autoDefault">
+           <bool>true</bool>
+          </property>
+          <property name="default">
+           <bool>false</bool>
           </property>
          </widget>
         </item>
@@ -148,19 +161,19 @@
        <widget class="QTextBrowser" name="textBrowser"/>
       </item>
       <item>
-       <layout class="QVBoxLayout" name="verticalLayout">
+       <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="QPushButton" name="pushButton">
-          <property name="text">
-           <string>确定</string>
+         <spacer name="verticalSpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
           </property>
-          <property name="autoDefault">
-           <bool>true</bool>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
           </property>
-          <property name="default">
-           <bool>false</bool>
-          </property>
-         </widget>
+         </spacer>
         </item>
         <item>
          <widget class="QPushButton" name="pushButton_2">
@@ -171,6 +184,19 @@
            <bool>true</bool>
           </property>
          </widget>
+        </item>
+        <item>
+         <spacer name="verticalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
         </item>
        </layout>
       </item>
@@ -196,7 +222,6 @@
   <tabstop>lineEdit</tabstop>
   <tabstop>lineEdit_3</tabstop>
   <tabstop>pushButton</tabstop>
-  <tabstop>pushButton_2</tabstop>
   <tabstop>lineEdit_2</tabstop>
   <tabstop>textBrowser</tabstop>
  </tabstops>
