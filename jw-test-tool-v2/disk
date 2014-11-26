@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="0.8"
+VERSION="1.1"
 slot_num=0
 
 

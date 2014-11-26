@@ -1,0 +1,16 @@
+#!/bin/bash
+logger -i "into start!"
+
+while true
+do
+	pid=`ps aux|grep jw-aging-bin | grep -v grep |awk '{print $2}'`
+	if [ ! $pid ] ;then
+		/usr/local/bin/jw-aging-bin &
+		logger -i "starting jw-aging-bin"
+		sleep 1
+	else
+		logger -i "jw-aging-bin started"
+		break
+	fi
+done
+logger -i "end start!"
