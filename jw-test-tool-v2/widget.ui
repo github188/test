@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1153</width>
-    <height>534</height>
+    <height>815</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -1351,8 +1351,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1098</width>
-            <height>692</height>
+            <width>1111</width>
+            <height>740</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout">
@@ -1474,6 +1474,76 @@
                </item>
                <item>
                 <widget class="QLineEdit" name="lineEdit_11">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="readOnly">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_64">
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_65">
+               <item>
+                <widget class="QLabel" name="label_27">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="text">
+                  <string>上次网络老化测试：</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="lineEdit_13">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="readOnly">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_66">
+               <item>
+                <widget class="QLabel" name="label_28">
+                 <property name="text">
+                  <string>上次SATA老化测试：</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="lineEdit_14">
+                 <property name="enabled">
+                  <bool>true</bool>
+                 </property>
+                 <property name="readOnly">
+                  <bool>true</bool>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="horizontalLayout_67">
+               <item>
+                <widget class="QLabel" name="label_29">
+                 <property name="text">
+                  <string>上次内存老化测试：</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="lineEdit_15">
                  <property name="enabled">
                   <bool>true</bool>
                  </property>
@@ -1751,8 +1821,8 @@
  <resources/>
  <connections/>
  <buttongroups>
+  <buttongroup name="buttonGroup"/>
   <buttongroup name="buttonGroup_2"/>
   <buttongroup name="buttonGroup_3"/>
-  <buttongroup name="buttonGroup"/>
  </buttongroups>
 </ui>

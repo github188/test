@@ -18,6 +18,10 @@
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
 #define JW_LOCKFILE "/run/lock/jw-aging-bin.lock"
+#define IO_TIME "/opt/.io_time"
+#define NET_TIME "/opt/.net_time"
+#define MEM_TIME "/opt/.mem_time"
+
 
 QString product_name;
 int eth_num;
@@ -41,8 +45,43 @@ static long mem_time = 0;
 
 int disk_speed_now=0;
 
+int store_time(const char *path, long time)
+{
+    int fd;
+    char buf[10];
+    ssize_t len;
 
-QString time_tostr(int time)
+    if (!path)
+        return -1;
+    sprintf(buf,"%ld\n", time);
+    len = strlen(buf);
+    if ((fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, 644)) < 0)
+        return -1;
+
+    if (write(fd, buf, len) != len) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    return 0;
+}
+int read_time(const char *path, char buf[], int len)
+{
+    int fd;
+
+    if (!path || !buf)
+        return -1;
+    if ((fd = open(path, O_RDONLY)) < 0)
+        return -1;
+    if (read(fd, buf, len) < 0) {
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    unlink(path);
+    return 0;
+}
+QString time_tostr(long time)
 {
     int hour = 0;
     int min = 0;
@@ -284,6 +323,24 @@ Widget::Widget(QWidget *parent) :
         pal.setColor(QPalette::Text,Qt::green);
         ui->lineEdit_11->setPalette(pal);
     }
+
+    char buf[10];
+    if (read_time(IO_TIME, buf, 10) < 0)
+        ui->lineEdit_14->setText("0");
+    else
+        ui->lineEdit_14->setText(time_tostr(atol(buf)));
+
+    if (read_time(NET_TIME, buf, 10) < 0)
+        ui->lineEdit_13->setText("0");
+    else
+        ui->lineEdit_13->setText(time_tostr(atol(buf)));
+
+    if (read_time(MEM_TIME, buf, 10) < 0)
+        ui->lineEdit_15->setText("0");
+    else
+        ui->lineEdit_15->setText(time_tostr(atol(buf)));
+
+
     if (net_start != 2) {
         cmd = "net_init &";
         bash_cmd(cmd);
@@ -444,6 +501,13 @@ Widget::~Widget()
 
         cmd = "killall nc > /dev/null 2>&1";
         bash_cmd(cmd);
+
+        if (disk_time != 0)
+            store_time(IO_TIME, disk_time);
+        if (net_time != 0)
+            store_time(NET_TIME, net_time);
+        if (mem_time != 0)
+            store_time(MEM_TIME, mem_time);
 
         cmd = "jw-aging aging_io_stop";
         bash_cmd(cmd);
@@ -969,6 +1033,9 @@ void Widget::on_pushButton_20_clicked()
     if (disk_timer->isActive()) {
         disk_timer->stop();
     }
+
+    store_time(IO_TIME, disk_time);
+
     disk_start=0;
     disk_time = 0;
     QPalette pal = ui->lineEdit_10->palette();
@@ -1059,6 +1126,8 @@ void Widget::on_pushButton_34_clicked()
     if (net_timer->isActive()) {
         net_timer->stop();
     }
+
+    store_time(NET_TIME, net_time);
     net_start=0;
     net_time = 0;
     QPalette pal = ui->lineEdit_9->palette();
@@ -1112,6 +1181,8 @@ void Widget::on_pushButton_36_clicked()
     if (mem_timer->isActive()) {
         mem_timer->stop();
     }
+
+    store_time(MEM_TIME, mem_time);
     mem_start=0;
     mem_time = 0;
     QPalette pal = ui->lineEdit_11->palette();

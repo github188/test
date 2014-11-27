@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include <QDebug>
 #include <QProcess>
+#include <unistd.h>
 
 QString ip;
 QString gateway;
@@ -52,6 +53,7 @@ int ip_cfg(QString ip, QString gateway)
         qDebug() << cmd;
         if (system(cmd.toLatin1()) != 0)
             i= 1;
+
         cmd = "route add default gw " + gateway;
         qDebug() << cmd;
         if (system(cmd.toLatin1()) != 0)
@@ -64,6 +66,7 @@ void MainWindow::on_pushButton_clicked()
     QString gate;
     int i;
 
+   ip = ui->lineEdit->text();
    gate = ui->lineEdit_3->text();
    i=ip_cfg(ip, gate);
    if(i==0) {
