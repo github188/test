@@ -904,9 +904,9 @@ sysdisk_info()
     sysdisk=`mount | grep " / "|awk '{print $1}'| tr -d [:digit:]`
     sysdisk_info=`smartctl -i $sysdisk`
 
-    sysdisk_mode=`echo "$sysdisk_info" | sed -n '5p'|awk -F : '{print $2}'`
-    sysdisk_cap=`echo "$sysdisk_info" | sed -n '9p' | awk -F : '{print $NF}'`
-    echo "$sysdisk $syspdisk_mode $sysdisk_cap"
+    sysdisk_mode=`echo "$sysdisk_info" | grep "Device Model" | awk -F : '{print $2}'`
+    sysdisk_cap=`echo "$sysdisk_info" | grep Capacity | awk -F : '{print $NF}'`
+    echo "$sysdisk $sysdisk_mode $sysdisk_cap"
 }
 sysled_status()
 {
