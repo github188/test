@@ -54,6 +54,10 @@ private slots:
 
     void on_pushButton_36_clicked();
 
+    void on_radioButton_9_clicked();
+
+    void on_radioButton_10_clicked();
+
 private:
     Ui::Widget *ui;
 };

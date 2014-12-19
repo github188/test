@@ -6,7 +6,7 @@
 # Filename : jw-aging.sh
 # Description : v0.3
 ###############################################################################
-VERSION="1.1"
+VERSION="1.2"
 iperf_tmp="/tmp/iperf"
 dd_tmp="/tmp/dd"
 net_speed_limit=100
@@ -208,6 +208,15 @@ diskled_test() {
     fi
 
     led-ctl -d $1 -i all
+}
+sound_test()
+{
+    if [ "$1" = "start" ];then
+	unity-control-center sound &
+    else
+	pid=`ps aux|grep "unity-control-center sound"|grep -v grep|awk '{print $2}'`
+	kill -9 $pid
+    fi
 }
 
 net_info()
@@ -1000,6 +1009,9 @@ case $1 in
     "diskled_test")
         diskled_test $2
         ;;
+    "sound")
+	sound_test $2
+	;;
     "disk_test")
         disk_test $2 $3
         ;;

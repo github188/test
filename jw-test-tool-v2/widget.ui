@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1153</width>
-    <height>815</height>
+    <width>1144</width>
+    <height>856</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -42,8 +42,8 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>0</y>
-            <width>1098</width>
+            <y>-393</y>
+            <width>1089</width>
             <height>1174</height>
            </rect>
           </property>
@@ -785,13 +785,6 @@
                </layout>
               </item>
               <item>
-               <widget class="QLabel" name="label_18">
-                <property name="text">
-                 <string>基础指示灯：电源灯、网络灯、系统运行灯等非程能控制的指示灯</string>
-                </property>
-               </widget>
-              </item>
-              <item>
                <layout class="QHBoxLayout" name="horizontalLayout_36">
                 <item>
                  <layout class="QHBoxLayout" name="horizontalLayout_40">
@@ -1095,6 +1088,96 @@
                </layout>
               </item>
               <item>
+               <layout class="QHBoxLayout" name="horizontalLayout_69">
+                <item>
+                 <layout class="QHBoxLayout" name="horizontalLayout_70">
+                  <item>
+                   <widget class="QLabel" name="label_31">
+                    <property name="minimumSize">
+                     <size>
+                      <width>100</width>
+                      <height>0</height>
+                     </size>
+                    </property>
+                    <property name="text">
+                     <string>音         频：</string>
+                    </property>
+                    <property name="alignment">
+                     <set>Qt::AlignCenter</set>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QRadioButton" name="radioButton_9">
+                    <property name="text">
+                     <string>启动检测</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QRadioButton" name="radioButton_10">
+                    <property name="text">
+                     <string>关闭检测</string>
+                    </property>
+                    <property name="checked">
+                     <bool>true</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="horizontalLayout_71">
+                    <item>
+                     <widget class="QPushButton" name="pushButton_39">
+                      <property name="minimumSize">
+                       <size>
+                        <width>85</width>
+                        <height>27</height>
+                       </size>
+                      </property>
+                      <property name="maximumSize">
+                       <size>
+                        <width>85</width>
+                        <height>27</height>
+                       </size>
+                      </property>
+                      <property name="text">
+                       <string>通过</string>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="pushButton_40">
+                      <property name="maximumSize">
+                       <size>
+                        <width>85</width>
+                        <height>27</height>
+                       </size>
+                      </property>
+                      <property name="text">
+                       <string>失败</string>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                 </layout>
+                </item>
+                <item>
+                 <spacer name="horizontalSpacer_13">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+              <item>
                <layout class="QHBoxLayout" name="horizontalLayout_24">
                 <item>
                  <spacer name="horizontalSpacer_5">
@@ -1328,6 +1411,9 @@
                </layout>
               </item>
              </layout>
+             <zorder>label_7</zorder>
+             <zorder></zorder>
+             <zorder>layoutWidget</zorder>
             </widget>
            </item>
           </layout>
@@ -1351,8 +1437,8 @@
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>1111</width>
-            <height>740</height>
+            <width>1102</width>
+            <height>781</height>
            </rect>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout">

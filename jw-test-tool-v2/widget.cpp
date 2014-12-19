@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#define  VERSION   1.1
+#define  VERSION   1.2
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -484,15 +484,73 @@ Widget::~Widget()
     lock.l_len = 0;
 
 
-    QMessageBox msgBox;
-    msgBox.setWindowTitle("警告");
-    msgBox.setText("警告：是否关闭正在进行的测试？");
-    msgBox.setInformativeText("是否关闭正在进行的测试?");
-    msgBox.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
-    msgBox.setDefaultButton(QMessageBox::Ok);
-    int ret = msgBox.exec();
-    switch (ret) {
-      case QMessageBox::Ok:
+
+    if (net_start || disk_start || mem_start) {
+        QMessageBox msgBox;
+        msgBox.setWindowTitle("警告");
+        msgBox.setText("警告：是否关闭正在进行的测试？");
+        msgBox.setInformativeText("是否关闭正在进行的测试?");
+        msgBox.setStandardButtons(QMessageBox::Cancel | QMessageBox::Ok);
+        msgBox.setDefaultButton(QMessageBox::Ok);
+        int ret = msgBox.exec();
+
+        switch (ret) {
+        case QMessageBox::Ok:
+            cmd = "killall iperf >/dev/null 2>&1";
+            bash_cmd(cmd);
+
+            cmd = "killall net_init > /dev/null 2>&1";
+            bash_cmd(cmd);
+
+            cmd = "killall nc > /dev/null 2>&1";
+            bash_cmd(cmd);
+
+            if (disk_time != 0)
+               store_time(IO_TIME, disk_time);
+            if (net_time != 0)
+                store_time(NET_TIME, net_time);
+            if (mem_time != 0)
+                store_time(MEM_TIME, mem_time);
+
+            cmd = "jw-aging aging_io_stop";
+            bash_cmd(cmd);
+
+            cmd = "jw-aging aging_mem_stop";
+            bash_cmd(cmd);
+
+            cmd = "jw-aging aging_net_stop";
+            bash_cmd(cmd);
+
+            cmd = "jw-aging sysled_test foff";
+            bash_cmd(cmd);
+
+            cmd = "jw-aging diskled_test off";
+            bash_cmd(cmd);
+
+            cmd = "jw-aging buzzer_test foff";
+            bash_cmd(cmd);
+
+            cmd = "jw-aging net_restory";
+            bash_cmd(cmd);
+
+            if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
+                cmd = "init_raid restore";
+                bash_cmd(cmd);
+            }
+            cmd = "rm -rf /tmp/old/* > /dev/null 2>&1";
+            bash_cmd(cmd);
+
+            cmd = "rm -rf /tmp/.jw-aging.* /tmp/route /tmp/disk_aging /tmp/disk_speed /tmp/dd /tmp/iostat /tmp/disk_speed.sh /tmp/mem_aging> /dev/null 2>&1";
+            bash_cmd(cmd);
+
+          break;
+        case QMessageBox::Cancel:
+              break;
+        default:
+              // should never be reached
+            break;
+        }
+    } else {
         cmd = "killall iperf >/dev/null 2>&1";
         bash_cmd(cmd);
 
@@ -503,7 +561,7 @@ Widget::~Widget()
         bash_cmd(cmd);
 
         if (disk_time != 0)
-            store_time(IO_TIME, disk_time);
+           store_time(IO_TIME, disk_time);
         if (net_time != 0)
             store_time(NET_TIME, net_time);
         if (mem_time != 0)
@@ -540,12 +598,6 @@ Widget::~Widget()
         cmd = "rm -rf /tmp/.jw-aging.* /tmp/route /tmp/disk_aging /tmp/disk_speed /tmp/dd /tmp/iostat /tmp/disk_speed.sh /tmp/mem_aging> /dev/null 2>&1";
         bash_cmd(cmd);
 
-          break;
-      case QMessageBox::Cancel:
-          break;
-      default:
-          // should never be reached
-          break;
     }
 
 
@@ -1259,5 +1311,20 @@ void Widget::get_mem_status()
     ui->lineEdit_6->setText(out);
 
 
+
+}
+
+void Widget::on_radioButton_9_clicked()
+{
+    QString cmd;
+    cmd = "jw-aging sound start";
+    bash_cmd(cmd);
+}
+
+void Widget::on_radioButton_10_clicked()
+{
+    QString cmd;
+    cmd = "jw-aging sound stop";
+    bash_cmd(cmd);
 
 }
