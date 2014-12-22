@@ -42,7 +42,7 @@
           <property name="geometry">
            <rect>
             <x>0</x>
-            <y>-393</y>
+            <y>0</y>
             <width>1089</width>
             <height>1174</height>
            </rect>
@@ -1109,6 +1109,23 @@
                   </item>
                   <item>
                    <widget class="QRadioButton" name="radioButton_9">
+                    <property name="enabled">
+                     <bool>true</bool>
+                    </property>
+                    <property name="toolTip">
+                     <string>测试音频帮助：
+选择启动检测后会弹出测试音频的子窗口，在该子窗口中进行需要的测试。
+1.测试音频输出
+选中子窗口的输出标签页，点击“测试声音”按钮，会弹出测试界面，
+分别点击左前和右前的测试按钮，进行测试。如果能听到声音则正常，
+听不到声音则不正常。
+2.测试音频输入
+选中子窗口的输入标签页，对着麦克风讲话， 如果“输入等级”的横条有颜色的变化，
+则输入正常，如果没有颜色变化，则输入不正常。</string>
+                    </property>
+                    <property name="autoFillBackground">
+                     <bool>false</bool>
+                    </property>
                     <property name="text">
                      <string>启动检测</string>
                     </property>
@@ -1413,7 +1430,6 @@
              </layout>
              <zorder>label_7</zorder>
              <zorder></zorder>
-             <zorder>layoutWidget</zorder>
             </widget>
            </item>
           </layout>
@@ -1907,8 +1923,8 @@
  <resources/>
  <connections/>
  <buttongroups>
-  <buttongroup name="buttonGroup"/>
   <buttongroup name="buttonGroup_2"/>
+  <buttongroup name="buttonGroup"/>
   <buttongroup name="buttonGroup_3"/>
  </buttongroups>
 </ui>

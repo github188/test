@@ -7,6 +7,7 @@
 #include <QPalette>
 #include <QThread>
 #include <QMessageBox>
+#include <QToolTip>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -157,6 +158,7 @@ Widget::Widget(QWidget *parent) :
     pal.setColor(QPalette::Text, Qt::darkYellow);
     ui->lineEdit_11->setPalette(pal);
 
+    ui->radioButton_9->setStyleSheet("QToolTip{border: 2px solid darkkhaki; padding: 5px; border-radius: 3px; opacity: 200; color:black; background-color: rgb(236, 243, 167);}");
 
     ui->lineEdit_9->setText("未启动");
     ui->lineEdit_10->setText("未启动");
