@@ -1,0 +1,104 @@
+body{
+	margin: 0px;
+	padding: 0px;
+	font: 13px "宋体",Arial;
+	background: #E6E6E6;	
+}
+.win{
+	margin: auto;
+	width: 800px;
+	height: 600px;
+	padding: 20px;
+	background-color: white;
+}
+.win_x{
+	width: 800px;
+	height: 600px;
+	margin: auto;
+	border: 1px solid green;
+}
+.left{
+	float: left;
+	display: inline-block;
+	width: 400px;
+	padding: 0 10px;
+	border-right: dashed 2px green;
+	height: 100%;
+}
+.left .left_stlye{
+	width: 380px;
+	padding: 10px;
+}
+.left_style_up{
+	color: red;
+	font-weight: bold;
+	font-size: 14px;
+}
+.letf_style_down{
+	line-height: 12px;
+}
+.left .left_mode{
+	width: 380px;
+	padding: 10px;
+}
+select{
+	color: red;
+}
+.radio{
+	background-color: red;
+/*	display: inline-block;*/
+}
+.display_4{
+	display:inline-block;
+	width:14px;
+	height:14px;
+}
+.radio_yes{
+	cursor: pointer;
+	background: url(radio_yes.jpg) no-repeat; 
+}
+.radio_no{
+	cursor: pointer;
+	background: url(radio_no.jpg) no-repeat;
+}
+.ul_li{
+	cursor: auto;
+}
+.none{
+	display: none;
+}
+.enter{
+	width:70px;
+	height:28px;
+	border-radius: 8px;
+	color: white;
+	text-shadow:0 1px 1px rgba(0,0,0,0.2);
+}
+.right{
+	float: left;
+	display: inline-block;
+	width: 335px;
+	padding: 0 10px;
+}
+.right_style{
+	padding: 10px;
+	margin-top:30px;
+	color: red;
+	font-weight: bold;
+	font-size: 14px;
+	margin-left: 20px;
+}
+li{
+	list-style: none;
+	margin-top: 10px;
+}
+li input,textarea{
+	margin-left: 5px;
+}
+.consult{
+	width: 120px;
+	height: 14px;
+	line-height: 14px;
+	margin-left: 180px;
+	margin-top: 10px;
+}

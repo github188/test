@@ -1,0 +1,136 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" /> 
+<link rel="shortcut icon" type="image/x-icon" href="home.ico" />
+<link rel="stylesheet" type="text/css" href="image/window.css">
+<script type="text/javascript" src="/jQuery-1.8.3.min.js/jquery-1.8.3.min.js"></script>
+<script type="text/javascript" src="system/fun.js"></script>
+<script type="text/javascript" src="system/new.js"></script>
+	<title>House</title>
+</head>
+
+<body>
+<div style="height:20px;"></div>
+<div class="win">
+    <div class="win_x">
+        <div class="left">
+            <div class="left_stlye" style="border-bottom: double 4px green;margin-top:30px;">
+                <div class="left_style_up">请您填写:</div>
+                <div class="letf_style_down">
+                    <p>贷款类别:
+                        <span name="1" class="radio_yes radio display_4" id="shang"></span>商业贷款&nbsp&nbsp
+                        <span name="2" class="radio_no radio display_4" id="gong"></span>公积金贷款
+                    </p>
+                </div>
+            </div>
+            <div class="left_mode" style="border-bottom: double 4px green;">
+                <div class="left_mode_name">计算方式:</div>
+                <div class="left_mode_middle">
+                    <div class="radio_yes radio" id="price" style="margin:10px 0px 0px 25px;"> 
+                        &nbsp&nbsp&nbsp根据面积、单价计算
+                        <ul class="ul_li">
+                            <li>
+                                单价:<input id="mon" type="text" style="width:80px; margin-left:4px;" />元/平米
+                            </li>
+                            <li>
+                                面积:<input id="area" type="text" style="width:80px; margin-left:4px;" />平方米
+                            </li>
+                            <li>
+                                按揭成数:
+                                <select id="mor">
+                                    <option value="0.90" name="nine">9成</option>
+                                    <option value="0.80" name="eight">8成</option>
+                                    <option value="0.70" name="seven" selected="selected">7成</option>
+                                    <option value="0.60" name="six">6成</option>
+                                    <option value="0.50" name="five">5成</option>
+                                    <option value="0.40" name="four">4成</option>
+                                    <option value="0.30" name="three">3成</option>
+                                    <option value="0.20" name="two">2成</option>
+                                </select>
+                            </li>
+                        </ul>
+                    </div> 
+                    <div id="total" class="radio_no radio" style="margin-left:26px;">
+                        <p style="margin-left:20px; margin-top:0px;">根据贷款总额计算</p>
+                        <p class="none" name="loan" style="cursor:auto;">贷款总额计算:<input id="loanTotal" type="text" style="width:80px;" />元</p>
+                    </div>
+                </div>
+                <div style="margin-left:26px;">
+                    <p style="margin-top:20px;margin-left:-23px;cursor:auto">
+                        按揭年数:
+                            <select id="years" style="width:120px;" onchange="lilvEnter()">
+                                <option value="1" name="one_year">1年 (12期)</option>
+                                <option value="2" name="two_year">2年 (24期)</option>
+                                <option value="3" name="three_year">3年 (36期)</option>
+                                <option value="4" name="four_year">4年 (48期)</option>
+                                <option value="5" name="five_year">5年 (60期)</option>
+                                <option value="6" name="six_year">6年 (72期)</option>
+                                <option value="7" name="seven_year">7年 (84期)</option>
+                                <option value="8" name="eight_year">8年 (96期)</option>
+                                <option value="9" name="nine_year">9年 (108期)</option>
+                                <option value="10" name="ten_year">10年 (120期)</option>
+                                <option value="11" name="eleven_year">11年 (132期)</option>
+                                <option value="12" name="twelve_year">12年 (144期)</option>
+                                <option value="13" name="thirteen_year">13年 (156期)</option>
+                                <option value="14" name="fourteen_year">14年 (168期)</option>
+                                <option value="15" name="fifteen_year">15年 (180期)</option>
+                                <option value="16" name="sixteen_year">16年 (192期)</option>
+                                <option value="17" name="seventeen_year">17年 (204期)</option>
+                                <option value="18" name="eighteen_year">18年 (216期)</option>
+                                <option value="19" name="nineteen_year">19年 (228期)</option>
+                                <option value="20" name="twenty_year" selected="selected">20年 (240期)</option>
+                                <option value="25" name="twenty_five_year">25年 (300期)</option>
+                                <option value="30" name="thirty_year">30年 (360期)</option>
+                            </select>
+                    </p>
+                </div>
+            </div>
+            <div class="left_stlye" style="border-bottom: double 4px green;">
+                贷款利率:
+                <select id="loan" style="width:220px;" onchange="lilvEnter();">
+                    <option value="1">14年11月22日利率上限(1.1倍)</option>
+                    <option value="2">14年11月22日利率下限(85折)</option>
+                    <option value="3">14年11月22日利率下限(7折)</option>
+                    <option value="4" selected="">14年11月22日基准利率</option>
+                    <option value="5">12年7月6日利率上限(1.1倍)</option>
+                    <option value="6">12年7月6日利率下限(85折)</option>
+                    <option value="7">12年7月6日利率下限(7折)</option>
+                    <option value="8">12年7月6日基准利率</option>
+                    <option value="9">12年6月8日利率上限(1.1倍)</option>
+                    <option value="10">12年6月8日利率下限(85折)</option>
+                    <option value="11">12年6月8日利率下限(7折)</option>
+                    <option value="12">12年6月8日基准利率</option>
+                </select>
+                <input type="text" id="rate" value="6.15" readonly="readonly" style="width:100px;color:red;margin:10px 5px 0px 55px;" />%
+            </div>
+            <div style="width:380px;padding:10px;border-bottom: double 4px green;">还款方式:
+                <span class="radio_yes radio display_4" id="xi" style="margin-left:10px;"></span>等额本息
+                <span class="radio_no radio display_4" id="jin" style="margin-left:10px;"></span>等额本金
+            </div>
+            <div style="margin:15px 0 auto 0;">
+                <center>
+                    <input id="enter" class="enter" type="button" style="background:#E78F04;width:100px" value="开始计算" onclick="calc();" />
+                    <input id="reset" class="enter" type="button" style="background:#2E8B93;width:100px;margin-left:10px;" value="重写填写" onclick="reset();" />
+                </center>
+            </div>
+        </div>
+        <div class="right">
+            <div class="right_style">查看结果:</div>
+            <ul class="rightShow">
+                <li>房款总额:<input id="MU" type="text" readonly="readonly" style="width:160px;" />元</li>
+                <li>贷款总额:<input id="loanMU" type="text" readonly="readonly" style="width:160px;" />元</li>
+                <li>还款总额:<input id="refund" type="text" readonly="readonly" style="width:160px;" />元</li>
+                <li style="margin-left:-13px;">支付利息款:<input id="interest" type="text" readonly="readonly" style="width:160px;" />元</li>
+                <li>首期付款:<input id="Down" type="text" readonly="readonly" style="width:160px;" />元</li>
+                <li>贷款月数:<input id="Y" type="text" readonly="readonly" style="width:160px;" /></li>
+                <li id="yue1">月均还款:<input id="mavg" type="text" readonly="readonly" style="width:160px;" />元</li>
+                <li class="none" id="yue2">月均金额:<textarea id="mavg1" rows="3" readonly="readonly" ></textarea>元</li>
+            </ul>
+            <div class="consult">*以上结果仅供参考</div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
