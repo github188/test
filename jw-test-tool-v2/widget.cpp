@@ -14,7 +14,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#define  VERSION   1.2
+#define  VERSION   1.3
 #define  DISK_MIN_READ  120
 #define  DISK_MIN_WRITE  100
 #define LOCKFILE "/run/lock/jw-aging.lock"
@@ -535,10 +535,13 @@ Widget::~Widget()
             cmd = "jw-aging net_restory";
             bash_cmd(cmd);
 
+            /*
             if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
                 cmd = "init_raid restore";
                 bash_cmd(cmd);
             }
+            */
+
             cmd = "rm -rf /tmp/old/* > /dev/null 2>&1";
             bash_cmd(cmd);
 
@@ -589,11 +592,12 @@ Widget::~Widget()
 
         cmd = "jw-aging net_restory";
         bash_cmd(cmd);
-
+    /*
         if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)") {
             cmd = "init_raid restore";
             bash_cmd(cmd);
         }
+        */
         cmd = "rm -rf /tmp/old/* > /dev/null 2>&1";
         bash_cmd(cmd);
 
