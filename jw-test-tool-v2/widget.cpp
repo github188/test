@@ -342,12 +342,6 @@ Widget::Widget(QWidget *parent) :
     else
         ui->lineEdit_15->setText(time_tostr(atol(buf)));
 
-
-    if (net_start != 2) {
-        cmd = "net_init &";
-        bash_cmd(cmd);
-
-    }
     if (disk_start != 2 && (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)")) {
         QString raid_cmd = "init_raid init";
 
@@ -373,6 +367,10 @@ Widget::Widget(QWidget *parent) :
         }
       }
 
+    if (!noip && net_start != 2) {
+        cmd = "net_init &";
+        bash_cmd(cmd);
+    }
 
     if (product_name == "SYS-6036C-S(3U-C216)" || product_name == "SYS-6036Z-S(3U-Z77)" || product_name == "CMS1100G2") {
 

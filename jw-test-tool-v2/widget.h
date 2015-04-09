@@ -3,6 +3,8 @@
 
 #include <QWidget>
 
+extern int noip;
+
 namespace Ui {
 class Widget;
 }
